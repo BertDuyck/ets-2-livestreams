@@ -47,11 +47,7 @@ import { LiveStreamsUtilFactoryService } from './live-streams-util-factory.servi
           <div class="animate-pulse h-4 bg-white/10 rounded w-64"></div>
         </div>
 
-        <div *ngIf="error()" class="rounded-xl border border-red-500/30 bg-red-950/40 p-4 text-red-200">
-          {{ error() }}
-        </div>
-
-        <div *ngIf="!loading() && !error()" class="overflow-auto rounded-md border border-gray-200 bg-white text-black">
+        <div *ngIf="!loading()" class="overflow-auto rounded-md border border-gray-200 bg-white text-black">
           <table class="min-w-full text-sm table-auto border-collapse">
             <thead class="text-left bg-gray-50">
               <tr class="border-b border-gray-200">
@@ -87,7 +83,6 @@ export class LivestreamsContainerComponent implements OnInit {
   total = signal(0);
   loading = signal(true);
   loaded = signal(false);
-  error = signal<string | null>(null);
 
   // Helper kept in case we want chips later
   getGenreTags(genre: string | undefined | null): string[] {
@@ -177,18 +172,12 @@ export class LivestreamsContainerComponent implements OnInit {
   }
 
   async ngOnInit() {
-    try {
-      this.loading.set(true);
-      const res = await firstValueFrom(this.util.findGameChannels('live_streams.sii'))
-        ?? { total: 0, filteredCount: 0, channels: [] };
-      this.channels.set(res.channels ?? []);
-      this.total.set(res.total ?? res.channels?.length ?? 0);
-      this.error.set(null);
-    } catch (e: any) {
-      this.error.set(e?.message ?? String(e));
-    } finally {
-      this.loading.set(false);
-      this.loaded.set(true);
-    }
+    this.loading.set(true);
+    const res = await firstValueFrom(this.util.findGameChannels('live_streams.sii'))
+      ?? { total: 0, filteredCount: 0, channels: [] };
+    this.channels.set(res.channels ?? []);
+    this.total.set(res.total ?? res.channels?.length ?? 0);
+    this.loading.set(false);
+    this.loaded.set(true);
   }
 }
