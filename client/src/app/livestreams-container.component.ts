@@ -27,10 +27,16 @@ type Channel = {
           <div class="text-sm text-gray-600" *ngIf="loaded()">
             Total channels: <span class="text-gray-900 font-medium">{{ total() }}</span>
           </div>
-          <button type="button" (click)="onExport()"
-                  class="inline-flex items-center gap-2 rounded-md bg-gray-900 text-white text-sm px-3 py-1.5 hover:bg-black/80">
-            Export live_streams.sii
-          </button>
+          <div class="flex items-center gap-2">
+            <button type="button" (click)="onImport()"
+                    class="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white text-gray-900 text-sm px-3 py-1.5 hover:bg-gray-50">
+              Import live_streams.sii
+            </button>
+            <button type="button" (click)="onExport()"
+                    class="inline-flex items-center gap-2 rounded-md bg-gray-900 text-white text-sm px-3 py-1.5 hover:bg-black/80">
+              Export live_streams.sii
+            </button>
+          </div>
         </div>
 
         <div *ngIf="loading()" class="rounded-xl border border-white/5 bg-[var(--ets-panel)]/95 p-6">
@@ -85,6 +91,20 @@ export class LivestreamsContainerComponent implements OnInit {
       .split(',')
       .map(s => s.trim())
       .filter(Boolean);
+  }
+
+  async onImport() {
+    try {
+      const res = await (window as any).api?.importLiveStreams?.('live_streams.sii');
+      if (!res || res.canceled) return;
+      // Refresh list after replacing file
+      const reload = await (window as any).api?.findGameChannels?.('live_streams.sii');
+      this.channels.set(reload?.channels ?? []);
+      this.total.set(reload?.total ?? reload?.channels?.length ?? 0);
+      console.log('Imported from', res.srcPath, '->', res.destPath);
+    } catch (e) {
+      console.error('Import failed', e);
+    }
   }
 
   async onExport() {

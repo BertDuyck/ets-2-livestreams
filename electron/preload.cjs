@@ -53,5 +53,19 @@ return markFavorite(filePath, indexOrIndexes, setFavorite);
     const destPath = join(destDir, fileName);
     await fs.copyFile(absSrc, destPath);
     return { canceled: false, destPath };
+  },
+
+  /**
+   * Pick a file and replace the target live_streams.sii on disk.
+   * @param {string} [targetPath='live_streams.sii']
+   * @returns {Promise<{canceled:boolean, srcPath?:string, destPath?:string}>}
+   */
+  async importLiveStreams(targetPath = 'live_streams.sii') {
+    const srcPath = await ipcRenderer.invoke('select-import-file');
+    if (!srcPath) return { canceled: true };
+    const fs = require('node:fs/promises');
+    const absDest = isAbsolute(targetPath) ? targetPath : resolve(process.cwd(), targetPath);
+    await fs.copyFile(srcPath, absDest);
+    return { canceled: false, srcPath, destPath: absDest };
   }
 });

@@ -45,6 +45,20 @@ app.whenReady().then(() => {
     if (res.canceled || !res.filePaths || !res.filePaths[0]) return null;
     return res.filePaths[0];
   });
+
+  // IPC: choose import file (live_streams.sii)
+  ipcMain.handle('select-import-file', async () => {
+    const res = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [
+        { name: 'SII files', extensions: ['sii'] },
+        { name: 'All files', extensions: ['*'] }
+      ]
+    });
+    if (res.canceled || !res.filePaths || !res.filePaths[0]) return null;
+    return res.filePaths[0];
+  });
+
   createWindow();
 });
 
