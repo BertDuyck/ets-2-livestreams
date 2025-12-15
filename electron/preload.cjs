@@ -67,5 +67,24 @@ return markFavorite(filePath, indexOrIndexes, setFavorite);
     const absDest = isAbsolute(targetPath) ? targetPath : resolve(process.cwd(), targetPath);
     await fs.copyFile(srcPath, absDest);
     return { canceled: false, srcPath, destPath: absDest };
+  },
+
+  /** Pick a file path for import (no reading/copying). */
+  async chooseImportFile() {
+    return ipcRenderer.invoke('select-import-file');
+  },
+
+  /** Read a text file (utf8). */
+  async readTextFile(filePath) {
+    const fs = require('node:fs/promises');
+    return fs.readFile(filePath, 'utf8');
+  },
+
+  /** Copy from an explicit source path to target (default live_streams.sii). */
+  async importLiveStreamsFromPath(srcPath, targetPath = 'live_streams.sii') {
+    const fs = require('node:fs/promises');
+    const absDest = isAbsolute(targetPath) ? targetPath : resolve(process.cwd(), targetPath);
+    await fs.copyFile(srcPath, absDest);
+    return { canceled: false, srcPath, destPath: absDest };
   }
 });

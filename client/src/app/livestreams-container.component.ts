@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 type Channel = {
@@ -10,6 +10,8 @@ type Channel = {
   bitrate: string;
   favorite: string; // '0' | '1'
 };
+
+import { LiveStreamsUtilFactoryService } from './live-streams-util-factory.service';
 
 @Component({
   selector: 'app-livestreams-container',
@@ -79,6 +81,7 @@ type Channel = {
   `,
 })
 export class LivestreamsContainerComponent implements OnInit {
+  private readonly util = inject(LiveStreamsUtilFactoryService);
   channels = signal<Channel[]>([]);
   total = signal(0);
   loading = signal(true);
@@ -93,12 +96,65 @@ export class LivestreamsContainerComponent implements OnInit {
       .filter(Boolean);
   }
 
+  // --- Validation helpers (pure, focused) ---
+  private hasCorrectPipeCount(payload: string, expected = 5): boolean {
+    const count = (payload.match(/\|/g) || []).length;
+    return count === expected;
+  }
+  private hasNoWhitespaceAroundPipes(payload: string): boolean {
+    return !(/[\s]\|/.test(payload) || /\|[\s]/.test(payload));
+  }
+  private isValidFavorite(value: string): boolean {
+    return value === '0' || value === '1';
+  }
+  private isValidBitrate(value: string): boolean {
+    return value === '' || /^[0-9]+$/.test(value);
+  }
+  private parseEntries(text: string): Array<{ line: number; index: number; payload: string; }>{
+    const lines = text.split(/\r?\n/);
+    const entryRe = /^\s*stream_data\[(\d+)\]:\s*"([^"]*)"/;
+    const entries: Array<{ line:number; index:number; payload:string; }> = [];
+    for (let i = 0; i < lines.length; i++) {
+      const m = lines[i].match(entryRe);
+      if (m) entries.push({ line: i + 1, index: Number(m[1]), payload: m[2] });
+    }
+    return entries.sort((a,b) => a.index - b.index);
+  }
+  private validateEntry(payload: string) {
+    const issues: string[] = [];
+    if (!this.hasCorrectPipeCount(payload)) issues.push('PIPE_COUNT: expected 5 pipes (6 fields)');
+    if (!this.hasNoWhitespaceAroundPipes(payload)) issues.push('PIPE_WHITESPACE: whitespace around pipe');
+    const parts = payload.split('|');
+    if (parts.length >= 6) {
+      const [url, name, , , bitrate, favorite] = parts;
+      if (!url) issues.push('URL_EMPTY');
+      if (!name) issues.push('NAME_EMPTY');
+      if (!this.isValidBitrate(bitrate)) issues.push('BITRATE_INVALID');
+      if (!this.isValidFavorite(favorite)) issues.push("FAVORITE_INVALID");
+    }
+    return { ok: issues.length === 0, issues, fieldsCount: parts.length };
+  }
+  private validateText(text: string) {
+    const entries = this.parseEntries(text);
+    const results = entries.map(e => ({ e, v: this.validateEntry(e.payload) }));
+    const invalid = results.filter(r => !r.v.ok);
+    return { ok: invalid.length === 0, entries, invalid };
+  }
+
   async onImport() {
     try {
-      const res = await (window as any).api?.importLiveStreams?.('live_streams.sii');
+      const filePath = await this.util.chooseImportFile();
+      if (!filePath) return;
+      const text = await this.util.readTextFile(filePath);
+      const report = this.validateText(String(text ?? ''));
+      if (!report.ok) {
+        const first = report.invalid.slice(0, 5).map(r => `line ${r.e.line} idx ${r.e.index}: ${r.v.issues.join(', ')}`).join('\n');
+        alert(`Invalid live_streams.sii format (\ninvalid entries: ${report.invalid.length}/${report.entries.length}\n)\n\nExamples:\n${first}`);
+        return;
+      }
+      const res = await this.util.importLiveStreamsFromPath(filePath, 'live_streams.sii');
       if (!res || res.canceled) return;
-      // Refresh list after replacing file
-      const reload = await (window as any).api?.findGameChannels?.('live_streams.sii');
+      const reload = await this.util.findGameChannels('live_streams.sii');
       this.channels.set(reload?.channels ?? []);
       this.total.set(reload?.total ?? reload?.channels?.length ?? 0);
       console.log('Imported from', res.srcPath, '->', res.destPath);
@@ -109,7 +165,7 @@ export class LivestreamsContainerComponent implements OnInit {
 
   async onExport() {
     try {
-      const res = await (window as any).api?.exportLiveStreams?.('live_streams.sii', 'live_streams.sii');
+      const res = await this.util.exportLiveStreams('live_streams.sii', 'live_streams.sii');
       if (!res || res.canceled) return;
       // Optional: simple visual feedback in the title line — could be replaced later
       // For now we just log; you can wire a toast later
@@ -122,7 +178,7 @@ export class LivestreamsContainerComponent implements OnInit {
   async ngOnInit() {
     try {
       this.loading.set(true);
-      const res = await (window as any).api?.findGameChannels?.('live_streams.sii')
+      const res = await this.util.findGameChannels('live_streams.sii')
         ?? { total: 0, filteredCount: 0, channels: [] };
       this.channels.set(res.channels ?? []);
       this.total.set(res.total ?? res.channels?.length ?? 0);
