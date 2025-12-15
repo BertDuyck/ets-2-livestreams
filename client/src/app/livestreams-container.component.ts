@@ -1,6 +1,5 @@
-import { Component, OnInit, signal, inject, DestroyRef } from '@angular/core';
+import { Component, OnInit, signal, inject } from '@angular/core';
 import { filter, finalize, map, switchMap, tap } from 'rxjs/operators';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 
 type Channel = {
@@ -80,7 +79,6 @@ import { LiveStreamsUtilFactoryService } from './live-streams-util-factory.servi
 })
 export class LivestreamsContainerComponent implements OnInit {
   private readonly util = inject(LiveStreamsUtilFactoryService);
-  private readonly destroyRef = inject(DestroyRef);
   channels = signal<Channel[]>([]);
   total = signal(0);
   loading = signal(true);
@@ -141,7 +139,6 @@ export class LivestreamsContainerComponent implements OnInit {
 
   onImport() {
     this.util.chooseImportFile().pipe(
-takeUntilDestroyed(this.destroyRef),
       filter((p): p is string => !!p),
       switchMap((path) => this.util.readTextFile(path).pipe(map(text => ({ path, text })))),
       map(({ path, text }) => ({ path, report: this.validateText(String(text ?? '')) })),
@@ -169,9 +166,7 @@ tap(({ report }) => {
   }
 
   onExport() {
-    this.util.exportLiveStreams('live_streams.sii', 'live_streams.sii').pipe(
-takeUntilDestroyed(this.destroyRef)
-    ).subscribe({
+    this.util.exportLiveStreams('live_streams.sii', 'live_streams.sii').subscribe({
       next: (res) => { if (!res?.canceled) console.log('Exported to', res.destPath); },
       error: (e) => console.error('Export failed', e)
     });
@@ -180,7 +175,6 @@ takeUntilDestroyed(this.destroyRef)
   ngOnInit() {
     this.loading.set(true);
     this.util.findGameChannels('live_streams.sii').pipe(
-takeUntilDestroyed(this.destroyRef),
       tap((res) => {
         this.channels.set(res.channels ?? []);
         this.total.set(res.total ?? res.channels?.length ?? 0);
