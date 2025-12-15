@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "channels:find": "node utils/live-streams/find-current-channels.js",
-    "channels:find:help": "node utils/live-streams/find-current-channels.js --help"
+    "channels:find:help": "node utils/live-streams/find-current-channels.js --help",
+    "channels:fav": "node utils/live-streams/mark-favorite.js",
+    "channels:fav:help": "node utils/live-streams/mark-favorite.js --help"
   }
 }
