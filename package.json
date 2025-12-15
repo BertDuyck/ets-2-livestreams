@@ -1,6 +1,7 @@
 {
   "name": "ets-radio-editor",
   "private": true,
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "channels:find": "node utils/live-streams/find-current-channels.js",
@@ -12,12 +13,42 @@
     "dev:ng": "npm --prefix client run start",
     "dev:electron": "wait-on http://localhost:4200 && cross-env ANGULAR_DEV_URL=http://localhost:4200 electron electron/main.mjs",
     "dev": "concurrently -k \"npm:dev:ng\" \"npm:dev:electron\"",
-    "build:renderer": "npm --prefix client run build"
+    "clean": "rimraf dist release || echo \"Warning: Could not clean build folders\"",
+    "build:renderer": "npm --prefix client run build",
+    "build:electron": "(npm run clean || true) && npm run build:renderer && electron-builder",
+    "build": "npm run build:electron"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",
     "electron": "^32.3.3",
+    "electron-builder": "^25.1.8",
+    "rimraf": "^6.1.2",
     "wait-on": "^8.0.5"
+  },
+  "main": "electron/main.mjs",
+  "build": {
+    "appId": "com.ets-radio-editor.app",
+    "productName": "ETS Radio Editor",
+    "files": [
+      "electron/**",
+      "client/dist/**",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "assets",
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "certificateFile": null,
+      "certificatePassword": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }

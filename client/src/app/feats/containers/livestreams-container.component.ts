@@ -12,70 +12,13 @@ type Channel = {
   favorite: string; // '0' | '1'
 };
 
-import { LiveStreamsUtilFactoryService } from './live-streams-util-factory.service';
+import { LiveStreamsUtilFactoryService } from '../../live-streams-util-factory.service';
 
 @Component({
   selector: 'app-livestreams-container',
   standalone: true,
   imports: [CommonModule],
-  template: `
-    <section class="min-h-screen p-6">
-      <div class="mx-auto max-w-6xl">
-<header class="flex items-center gap-3 mb-3 rounded-md bg-gray-100 px-3 py-2 border border-gray-200">
-          <div class="h-6 w-1.5 rounded bg-[var(--ets-accent)]"></div>
-          <h1 class="text-2xl font-semibold tracking-tight">Radio Editor</h1>
-        </header>
-
-<div class="mb-3 flex items-center justify-between">
-          <div class="text-sm text-gray-600" *ngIf="loaded()">
-            Total channels: <span class="text-gray-900 font-medium">{{ total() }}</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <button type="button" (click)="onImport()"
-                    class="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white text-gray-900 text-sm px-3 py-1.5 hover:bg-gray-50">
-              Import live_streams.sii
-            </button>
-            <button type="button" (click)="onExport()"
-                    class="inline-flex items-center gap-2 rounded-md bg-gray-900 text-white text-sm px-3 py-1.5 hover:bg-black/80">
-              Export live_streams.sii
-            </button>
-          </div>
-        </div>
-
-        <div *ngIf="loading()" class="rounded-xl border border-white/5 bg-[var(--ets-panel)]/95 p-6">
-          <div class="animate-pulse h-4 bg-white/10 rounded w-40 mb-3"></div>
-          <div class="animate-pulse h-4 bg-white/10 rounded w-64"></div>
-        </div>
-
-        <div *ngIf="!loading()" class="overflow-auto rounded-md border border-gray-200 bg-white text-black">
-          <table class="min-w-full text-sm table-auto border-collapse">
-            <thead class="text-left bg-gray-50">
-              <tr class="border-b border-gray-200">
-                <th class="py-2 px-3">#</th>
-                <th class="py-2 px-3">Name</th>
-                <th class="py-2 px-3">URL</th>
-                <th class="py-2 px-3">Genre</th>
-                <th class="py-2 px-3">Lang</th>
-                <th class="py-2 px-3">Bitrate</th>
-                <th class="py-2 px-3">Favorite</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let ch of channels()" class="border-b border-gray-200">
-                <td class="py-2 px-3">{{ ch.index }}</td>
-                <td class="py-2 px-3">{{ ch.name || 'Unnamed Station' }}</td>
-                <td class="py-2 px-3 break-all">{{ ch.url }}</td>
-                <td class="py-2 px-3">{{ ch.genre }}</td>
-                <td class="py-2 px-3">{{ ch.lang }}</td>
-                <td class="py-2 px-3">{{ ch.bitrate }}</td>
-                <td class="py-2 px-3">{{ ch.favorite === '1' ? 'Yes' : 'No' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-  `,
+  templateUrl: './livestreams-container.component.html',
 })
 export class LivestreamsContainerComponent implements OnInit {
   private readonly util = inject(LiveStreamsUtilFactoryService);
@@ -83,6 +26,10 @@ export class LivestreamsContainerComponent implements OnInit {
   total = signal(0);
   loading = signal(true);
   loaded = signal(false);
+  playingIndex = signal<number | null>(null);
+  loadingIndex = signal<number | null>(null);
+  errorIndex = signal<number | null>(null);
+  private audioElement: HTMLAudioElement | null = null;
 
   // Helper kept in case we want chips later
   getGenreTags(genre: string | undefined | null): string[] {
@@ -90,6 +37,40 @@ export class LivestreamsContainerComponent implements OnInit {
       .split(',')
       .map(s => s.trim())
       .filter(Boolean);
+  }
+
+  playStream(channel: Channel) {
+    if (this.playingIndex() === channel.index) {
+      this.stopStream();
+      return;
+    }
+
+    if (this.audioElement) {
+      this.audioElement.pause();
+      this.audioElement = null;
+    }
+
+    this.playingIndex.set(null);
+    this.errorIndex.set(null);
+    this.loadingIndex.set(channel.index);
+    this.audioElement = new Audio(channel.url);
+    this.audioElement.play().then(() => {
+      this.loadingIndex.set(null);
+      this.playingIndex.set(channel.index);
+    }).catch(err => {
+      this.loadingIndex.set(null);
+      this.errorIndex.set(channel.index);
+      console.error('Failed to play stream:', err);
+      alert(`Unable to play stream: ${channel.name}`);
+    });
+  }
+
+  stopStream() {
+    if (this.audioElement) {
+      this.audioElement.pause();
+      this.audioElement = null;
+    }
+    this.playingIndex.set(null);
   }
 
   // --- Validation helpers (pure, focused) ---
