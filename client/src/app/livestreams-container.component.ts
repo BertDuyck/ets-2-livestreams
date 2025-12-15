@@ -145,9 +145,15 @@ export class LivestreamsContainerComponent implements OnInit {
       filter((p): p is string => !!p),
       switchMap((path) => this.util.readTextFile(path).pipe(map(text => ({ path, text })))),
       map(({ path, text }) => ({ path, report: this.validateText(String(text ?? '')) })),
-      tap(({ report }) => {
+tap(({ report }) => {
         if (!report.ok) {
-          const first = report.invalid.slice(0, 5).map(r => `line ${r.e.line} idx ${r.e.index}: ${r.v.issues.join(', ')}`).join('\n');
+          const formatInvalidPreview = (items: Array<{ e: { line: number; index: number }; v: { issues: string[] } }>) =>
+            items
+              .slice(0, 5)
+              .map(r => `line ${r.e.line} idx ${r.e.index}: ${r.v.issues.join(', ')}`)
+              .join('\n');
+
+          const first = formatInvalidPreview(report.invalid);
           alert(`Invalid live_streams.sii format (\ninvalid entries: ${report.invalid.length}/${report.entries.length}\n)\n\nExamples:\n${first}`);
         }
       }),
