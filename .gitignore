@@ -12,6 +12,7 @@ client/dist/
 dist/
 build/
 out/
+backups/
 
 # OS
 .DS_Store

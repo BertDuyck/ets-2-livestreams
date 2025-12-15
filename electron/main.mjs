@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -36,7 +36,31 @@ function createWindow() {
   return win.loadFile(indexHtml);
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  // IPC: choose export directory
+  ipcMain.handle('select-export-dir', async () => {
+    const res = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory']
+    });
+    if (res.canceled || !res.filePaths || !res.filePaths[0]) return null;
+    return res.filePaths[0];
+  });
+
+  // IPC: choose import file (live_streams.sii)
+  ipcMain.handle('select-import-file', async () => {
+    const res = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [
+        { name: 'SII files', extensions: ['sii'] },
+        { name: 'All files', extensions: ['*'] }
+      ]
+    });
+    if (res.canceled || !res.filePaths || !res.filePaths[0]) return null;
+    return res.filePaths[0];
+  });
+
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
