@@ -1,4 +1,5 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { CommonModule } from '@angular/common';
 
 type Channel = {
@@ -143,18 +144,18 @@ export class LivestreamsContainerComponent implements OnInit {
 
   async onImport() {
     try {
-      const filePath = await this.util.chooseImportFile();
+      const filePath = await firstValueFrom(this.util.chooseImportFile());
       if (!filePath) return;
-      const text = await this.util.readTextFile(filePath);
+      const text = await firstValueFrom(this.util.readTextFile(filePath));
       const report = this.validateText(String(text ?? ''));
       if (!report.ok) {
         const first = report.invalid.slice(0, 5).map(r => `line ${r.e.line} idx ${r.e.index}: ${r.v.issues.join(', ')}`).join('\n');
         alert(`Invalid live_streams.sii format (\ninvalid entries: ${report.invalid.length}/${report.entries.length}\n)\n\nExamples:\n${first}`);
         return;
       }
-      const res = await this.util.importLiveStreamsFromPath(filePath, 'live_streams.sii');
+      const res = await firstValueFrom(this.util.importLiveStreamsFromPath(filePath, 'live_streams.sii'));
       if (!res || res.canceled) return;
-      const reload = await this.util.findGameChannels('live_streams.sii');
+      const reload = await firstValueFrom(this.util.findGameChannels('live_streams.sii'));
       this.channels.set(reload?.channels ?? []);
       this.total.set(reload?.total ?? reload?.channels?.length ?? 0);
       console.log('Imported from', res.srcPath, '->', res.destPath);
@@ -165,7 +166,7 @@ export class LivestreamsContainerComponent implements OnInit {
 
   async onExport() {
     try {
-      const res = await this.util.exportLiveStreams('live_streams.sii', 'live_streams.sii');
+      const res = await firstValueFrom(this.util.exportLiveStreams('live_streams.sii', 'live_streams.sii'));
       if (!res || res.canceled) return;
       // Optional: simple visual feedback in the title line — could be replaced later
       // For now we just log; you can wire a toast later
@@ -178,7 +179,7 @@ export class LivestreamsContainerComponent implements OnInit {
   async ngOnInit() {
     try {
       this.loading.set(true);
-      const res = await this.util.findGameChannels('live_streams.sii')
+      const res = await firstValueFrom(this.util.findGameChannels('live_streams.sii'))
         ?? { total: 0, filteredCount: 0, channels: [] };
       this.channels.set(res.channels ?? []);
       this.total.set(res.total ?? res.channels?.length ?? 0);
