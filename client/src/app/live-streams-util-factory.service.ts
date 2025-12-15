@@ -44,11 +44,32 @@ export class LiveStreamsUtilFactoryService {
     );
   }
 
-  /**
+    /**
    * Export an existing live_streams.sii to a user-selected directory.
    */
   exportLiveStreams(sourcePath = 'live_streams.sii', fileName = 'live_streams.sii'): Observable<{ canceled: boolean; destPath?: string }>{
     return from((window as any).api?.exportLiveStreams?.(sourcePath, fileName) as Promise<{ canceled: boolean; destPath?: string }>).pipe(
+      catchError(() => of({ canceled: true as const }))
+    );
+  }
+
+  /**
+   * Export live_streams.sii with updated channel data (e.g., modified favorites)
+   */
+  exportLiveStreamsWithData(
+    channels: Array<{
+      index: number;
+      url: string;
+      name: string;
+      genre: string;
+      lang: string;
+      bitrate: string;
+      favorite: string;
+    }>,
+    sourcePath = 'live_streams.sii',
+    fileName = 'live_streams.sii'
+  ): Observable<{ canceled: boolean; destPath?: string }> {
+    return from((window as any).api?.exportLiveStreamsWithData?.(channels, sourcePath, fileName) as Promise<{ canceled: boolean; destPath?: string }>).pipe(
       catchError(() => of({ canceled: true as const }))
     );
   }
@@ -67,10 +88,30 @@ export class LiveStreamsUtilFactoryService {
     );
   }
 
-  /** Replace the target live_streams.sii with a chosen source path. */
+    /** Replace the target live_streams.sii with a chosen source path. */
   importLiveStreamsFromPath(srcPath: string, targetPath = 'live_streams.sii'): Observable<{ canceled: boolean; srcPath?: string; destPath?: string }>{
     return from((window as any).api?.importLiveStreamsFromPath?.(srcPath, targetPath) as Promise<{ canceled: boolean; srcPath?: string; destPath?: string }>).pipe(
       catchError(() => of({ canceled: true as const }))
+    );
+  }
+
+  /**
+   * Save updated channel data to the original file (overwrite)
+   */
+  saveLiveStreamsData(
+    channels: Array<{
+      index: number;
+      url: string;
+      name: string;
+      genre: string;
+      lang: string;
+      bitrate: string;
+      favorite: string;
+    }>,
+    targetPath = 'live_streams.sii'
+  ): Observable<{ success: boolean; error?: string }> {
+    return from((window as any).api?.saveLiveStreamsData?.(channels, targetPath) as Promise<{ success: boolean; error?: string }>).pipe(
+      catchError((error) => of({ success: false, error: error?.message || 'Save failed' }))
     );
   }
 }

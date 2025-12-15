@@ -185,6 +185,77 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   /**
+   * Export live_streams.sii with updated channel data (e.g., modified favorites)
+   * @param {Array<{index:number, url:string, name:string, genre:string, lang:string, bitrate:string, favorite:string}>} channels
+   * @param {string} [sourcePath='live_streams.sii']
+   * @param {string} [fileName='live_streams.sii']
+   * @returns {Promise<{canceled:boolean, destPath?:string}>}
+   */
+  async exportLiveStreamsWithData(channels, sourcePath = 'live_streams.sii', fileName = 'live_streams.sii') {
+    try {
+      if (!isAbsolute(sourcePath)) {
+        const appPath = await this.getAppPath();
+        sourcePath = join(appPath, sourcePath);
+      }
+      
+      // Read the original file to preserve header/footer and non-stream_data lines
+      let originalContent = '';
+      try {
+        originalContent = await fs.readFile(sourcePath, 'utf8');
+      } catch {
+        const debugInfo = await this.debugPaths(fileName);
+        const existingPath = debugInfo.attempts.find(a => a.exists);
+        if (existingPath) {
+          sourcePath = existingPath.path;
+          originalContent = await fs.readFile(sourcePath, 'utf8');
+        } else {
+          return { canceled: true, error: 'Source file not found' };
+        }
+      }
+
+      // Parse the original content to preserve structure
+      const lines = originalContent.split(/\r?\n/);
+      const entryRegex = /^(\s*stream_data\[(\d+)\]:\s*")([^"]*)(".*)?$/;
+      const updatedLines = [];
+      
+      // Create a map of channels by index for quick lookup
+      const channelMap = new Map(channels.map(ch => [ch.index, ch]));
+      
+      for (const line of lines) {
+        const match = line.match(entryRegex);
+        if (match) {
+          const prefix = match[1];
+          const index = Number(match[2]);
+          const suffix = match[4] || '"';
+          
+          const channel = channelMap.get(index);
+          if (channel) {
+            // Format the channel data with pipe delimiters
+            const payload = `${channel.url}|${channel.name}|${channel.genre}|${channel.lang}|${channel.bitrate}|${channel.favorite}`;
+            updatedLines.push(`${prefix}${payload}${suffix}`);
+          } else {
+            // Keep original line if no update for this index
+            updatedLines.push(line);
+          }
+        } else {
+          // Keep non-stream_data lines as-is
+          updatedLines.push(line);
+        }
+      }
+      
+      const destDir = await ipcRenderer.invoke('select-export-dir');
+      if (!destDir) return { canceled: true };
+      
+      const destPath = join(destDir, fileName);
+      await fs.writeFile(destPath, updatedLines.join('\n'), 'utf8');
+      return { canceled: false, destPath };
+    } catch (error) {
+      console.error('Export error:', error);
+      return { canceled: true, error: error.message };
+    }
+  },
+
+  /**
    * Pick a file and replace the target live_streams.sii on disk.
    * @param {string} [targetPath='live_streams.sii']
    * @returns {Promise<{canceled:boolean, srcPath?:string, destPath?:string}>}
@@ -255,6 +326,93 @@ contextBridge.exposeInMainWorld('api', {
     return [];
   },
   
+  /**
+   * Save updated channel data to the original file (overwrite)
+   * @param {Array<{index:number, url:string, name:string, genre:string, lang:string, bitrate:string, favorite:string}>} channels
+   * @param {string} [targetPath='live_streams.sii']
+   * @returns {Promise<{success:boolean, error?:string}>}
+   */
+  async saveLiveStreamsData(channels, targetPath = 'live_streams.sii') {
+    try {
+      if (!isAbsolute(targetPath)) {
+        const appPath = await this.getAppPath();
+        targetPath = join(appPath, targetPath);
+      }
+      
+      // Read the original file
+      let originalContent = '';
+      try {
+        originalContent = await fs.readFile(targetPath, 'utf8');
+      } catch (error) {
+        const debugInfo = await this.debugPaths(targetPath);
+        const existingPath = debugInfo.attempts.find(a => a.exists);
+        if (existingPath) {
+          targetPath = existingPath.path;
+          originalContent = await fs.readFile(targetPath, 'utf8');
+        } else {
+          return { success: false, error: 'File not found' };
+        }
+      }
+
+      // Create backup before overwriting
+      const backupsRoot = join(dirname(targetPath), 'backups', 'live_streams');
+      await fs.mkdir(backupsRoot, { recursive: true });
+      const ts = new Date();
+      const pad = (n, w=2) => String(n).padStart(w, '0');
+      const name = `live_streams_${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}-${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}-${pad(ts.getMilliseconds(),3)}.sii`;
+      const backupPath = join(backupsRoot, name);
+      await fs.copyFile(targetPath, backupPath);
+      
+      // Keep only 10 newest backups
+      try {
+        const entries = await fs.readdir(backupsRoot, { withFileTypes: true });
+        const files = entries.filter(e => e.isFile() && e.name.endsWith('.sii'))
+          .map(e => ({ name: e.name, path: join(backupsRoot, e.name) }));
+        files.sort((a,b) => b.name.localeCompare(a.name));
+        const toDelete = files.slice(10);
+        await Promise.allSettled(toDelete.map(f => fs.unlink(f.path)));
+      } catch {}
+
+      // Parse and update the content
+      const lines = originalContent.split(/\r?\n/);
+      const entryRegex = /^(\s*stream_data\[(\d+)\]:\s*")([^"]*)(".*)?$/;
+      const updatedLines = [];
+      
+      // Create a map of channels by index for quick lookup
+      const channelMap = new Map(channels.map(ch => [ch.index, ch]));
+      
+      for (const line of lines) {
+        const match = line.match(entryRegex);
+        if (match) {
+          const prefix = match[1];
+          const index = Number(match[2]);
+          const suffix = match[4] || '"';
+          
+          const channel = channelMap.get(index);
+          if (channel) {
+            // Format the channel data with pipe delimiters
+            const payload = `${channel.url}|${channel.name}|${channel.genre}|${channel.lang}|${channel.bitrate}|${channel.favorite}`;
+            updatedLines.push(`${prefix}${payload}${suffix}`);
+          } else {
+            // Keep original line if no update for this index
+            updatedLines.push(line);
+          }
+        } else {
+          // Keep non-stream_data lines as-is
+          updatedLines.push(line);
+        }
+      }
+      
+      // Write back to the original file
+      await fs.writeFile(targetPath, updatedLines.join('\n'), 'utf8');
+      console.log(`Saved changes to ${targetPath}`);
+      return { success: true };
+    } catch (error) {
+      console.error('Save error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
   // Stub for markFavorite - can be implemented later if needed  
   async markFavorite(filePath, indexOrIndexes, setFavorite = true) {
     console.warn('markFavorite not yet implemented in production build');
