@@ -3,8 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "add:willy": "node tools/add_willy.js",
-    "add:willy:classx": "node tools/add_willy_classx.js",
-    "add:willy:both": "npm run --silent add:willy && npm run --silent add:willy:classx"
+    "channels:find": "node utils/live-streams/find-current-channels.js",
+    "channels:find:help": "node utils/live-streams/find-current-channels.js --help"
   }
 }
