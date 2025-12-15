@@ -1,5 +1,5 @@
 {
-  "name": "ets-radio-editor",
+  "name": "dukes-ets-editor",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -10,15 +10,16 @@
     "channels:fav:help": "node utils/live-streams/mark-favorite.js --help",
     "channels:public": "node utils/live-streams/fetch-public-stations.js",
     "channels:public:help": "node utils/live-streams/fetch-public-stations.js --tag=lofi --limit=10",
-    "dev:ng": "npm --prefix client run start",
+    "dev:ng": "cd client && ng serve",
     "dev:electron": "wait-on http://localhost:4200 && cross-env ANGULAR_DEV_URL=http://localhost:4200 electron electron/main.mjs",
     "dev": "concurrently -k \"npm:dev:ng\" \"npm:dev:electron\"",
-    "clean": "rimraf dist release || echo \"Warning: Could not clean build folders\"",
-    "build:renderer": "npm --prefix client run build",
+    "clean": "rimraf dist || echo \"Warning: Could not clean build folders\"",
+    "build:renderer": "cd client && ng build",
     "build:electron": "(npm run clean || true) && npm run build:renderer && electron-builder",
     "build": "npm run build:electron"
   },
   "devDependencies": {
+    "@angular/cli": "^21.0.3",
     "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",
     "electron": "^32.3.3",
@@ -28,23 +29,25 @@
   },
   "main": "electron/main.mjs",
   "build": {
-    "appId": "com.ets-radio-editor.app",
-    "productName": "ETS Radio Editor",
+    "appId": "com.dukes-ets-editor.app",
+    "productName": "Dukes ETS Editor",
     "files": [
       "electron/**",
       "client/dist/**",
-      "package.json"
+      "utils/**",
+      "package.json",
+      "live_streams.sii"
     ],
     "directories": {
-      "buildResources": "assets",
-      "output": "release"
+      "buildResources": "assets"
     },
     "win": {
       "target": [
-        "portable"
+        "dir"
       ],
       "certificateFile": null,
-      "certificatePassword": null
+      "certificatePassword": null,
+      "sign": false
     },
     "nsis": {
       "oneClick": false,

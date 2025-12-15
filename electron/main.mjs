@@ -46,6 +46,9 @@ app.whenReady().then(() => {
     return res.filePaths[0];
   });
 
+  // IPC: get app path
+  ipcMain.handle('get-app-path', () => app.getAppPath());
+
   // IPC: choose import file (live_streams.sii)
   ipcMain.handle('select-import-file', async () => {
     const res = await dialog.showOpenDialog({
