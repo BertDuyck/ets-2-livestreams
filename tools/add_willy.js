@@ -3,8 +3,8 @@ import { insertAfterName } from './livestreams.js';
 
 const file = process.argv[2] || 'live_streams.sii';
 const station = {
-  url: 'https://streams.radio.dpgmedia.cloud/redirect/willy_be_class_x/mp3',
-  name: 'Willy Class X',
+  url: 'https://streams.radio.dpgmedia.cloud/redirect/willy_be/mp3',
+  name: 'Willy',
   genre: 'Rock',
   lang: 'NL',
   bitrate: '',
