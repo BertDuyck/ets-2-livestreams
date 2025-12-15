@@ -12,93 +12,13 @@ type Channel = {
   favorite: string; // '0' | '1'
 };
 
-import { LiveStreamsUtilFactoryService } from './live-streams-util-factory.service';
+import { LiveStreamsUtilFactoryService } from '../../live-streams-util-factory.service';
 
 @Component({
   selector: 'app-livestreams-container',
   standalone: true,
   imports: [CommonModule],
-  template: `
-    <section class="min-h-screen p-6">
-      <div class="mx-auto max-w-6xl">
-<header class="flex items-center gap-3 mb-3 rounded-md bg-gray-100 px-3 py-2 border border-gray-200">
-          <div class="h-6 w-1.5 rounded bg-[var(--ets-accent)]"></div>
-          <h1 class="text-2xl font-semibold tracking-tight">Radio Editor</h1>
-        </header>
-
-<div class="mb-3 flex items-center justify-between">
-          <div class="text-sm text-gray-600" *ngIf="loaded()">
-            Total channels: <span class="text-gray-900 font-medium">{{ total() }}</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <button type="button" (click)="onImport()"
-                    class="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white text-gray-900 text-sm px-3 py-1.5 hover:bg-gray-50">
-              Import live_streams.sii
-            </button>
-            <button type="button" (click)="onExport()"
-                    class="inline-flex items-center gap-2 rounded-md bg-gray-900 text-white text-sm px-3 py-1.5 hover:bg-black/80">
-              Export live_streams.sii
-            </button>
-          </div>
-        </div>
-
-        <div *ngIf="loading()" class="rounded-xl border border-white/5 bg-[var(--ets-panel)]/95 p-6">
-          <div class="animate-pulse h-4 bg-white/10 rounded w-40 mb-3"></div>
-          <div class="animate-pulse h-4 bg-white/10 rounded w-64"></div>
-        </div>
-
-        <div *ngIf="!loading()" class="overflow-auto rounded-md border border-gray-200 bg-white text-black">
-          <table class="min-w-full text-sm table-auto border-collapse">
-            <thead class="text-left bg-gray-50">
-              <tr class="border-b border-gray-200">
-                <th class="py-2 px-3">#</th>
-                <th class="py-2 px-3">Name</th>
-                <th class="py-2 px-3">URL</th>
-                <th class="py-2 px-3">Genre</th>
-                <th class="py-2 px-3">Lang</th>
-                <th class="py-2 px-3">Bitrate</th>
-                <th class="py-2 px-3">Favorite</th>
-                <th class="py-2 px-3">Play</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let ch of channels()" class="border-b border-gray-200">
-                <td class="py-2 px-3">{{ ch.index }}</td>
-                <td class="py-2 px-3">{{ ch.name || 'Unnamed Station' }}</td>
-                <td class="py-2 px-3 break-all">{{ ch.url }}</td>
-                <td class="py-2 px-3">{{ ch.genre }}</td>
-                <td class="py-2 px-3">{{ ch.lang }}</td>
-                <td class="py-2 px-3">{{ ch.bitrate }}</td>
-                <td class="py-2 px-3">{{ ch.favorite === '1' ? 'Yes' : 'No' }}</td>
-                <td class="py-2 px-3">
-                  <button type="button" (click)="playStream(ch)"
-                          [disabled]="loadingIndex() === ch.index"
-                          [class.bg-red-500]="playingIndex() === ch.index"
-                          [class.hover:bg-red-600]="playingIndex() === ch.index"
-                          [class.bg-orange-500]="errorIndex() === ch.index"
-                          [class.hover:bg-orange-600]="errorIndex() === ch.index"
-                          [class.bg-gray-900]="playingIndex() !== ch.index && loadingIndex() !== ch.index && errorIndex() !== ch.index"
-                          [class.hover:bg-black/80]="playingIndex() !== ch.index && loadingIndex() !== ch.index && errorIndex() !== ch.index"
-                          [class.bg-gray-400]="loadingIndex() === ch.index"
-                          class="inline-flex items-center justify-center gap-1 rounded text-white text-xs px-2 py-1 w-14">
-                    <svg *ngIf="loadingIndex() === ch.index" class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <svg *ngIf="errorIndex() === ch.index && loadingIndex() !== ch.index" class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span *ngIf="loadingIndex() !== ch.index && errorIndex() !== ch.index">{{ playingIndex() === ch.index ? 'Stop' : 'Play' }}</span>
-                    <span *ngIf="errorIndex() === ch.index && loadingIndex() !== ch.index">Retry</span>
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-  `,
+  templateUrl: './livestreams-container.component.html',
 })
 export class LivestreamsContainerComponent implements OnInit {
   private readonly util = inject(LiveStreamsUtilFactoryService);
