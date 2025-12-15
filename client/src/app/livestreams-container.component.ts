@@ -1,5 +1,7 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { of } from 'rxjs';
+import { filter, finalize, map, switchMap, tap } from 'rxjs/operators';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 
 type Channel = {
@@ -137,47 +139,50 @@ export class LivestreamsContainerComponent implements OnInit {
     return { ok: invalid.length === 0, entries, invalid };
   }
 
-  async onImport() {
-    try {
-      const filePath = await firstValueFrom(this.util.chooseImportFile());
-      if (!filePath) return;
-      const text = await firstValueFrom(this.util.readTextFile(filePath));
-      const report = this.validateText(String(text ?? ''));
-      if (!report.ok) {
-        const first = report.invalid.slice(0, 5).map(r => `line ${r.e.line} idx ${r.e.index}: ${r.v.issues.join(', ')}`).join('\n');
-        alert(`Invalid live_streams.sii format (\ninvalid entries: ${report.invalid.length}/${report.entries.length}\n)\n\nExamples:\n${first}`);
-        return;
-      }
-      const res = await firstValueFrom(this.util.importLiveStreamsFromPath(filePath, 'live_streams.sii'));
-      if (!res || res.canceled) return;
-      const reload = await firstValueFrom(this.util.findGameChannels('live_streams.sii'));
-      this.channels.set(reload?.channels ?? []);
-      this.total.set(reload?.total ?? reload?.channels?.length ?? 0);
-      console.log('Imported from', res.srcPath, '->', res.destPath);
-    } catch (e) {
-      console.error('Import failed', e);
-    }
+  onImport() {
+    this.util.chooseImportFile().pipe(
+      takeUntilDestroyed(),
+      filter((p): p is string => !!p),
+      switchMap((path) => this.util.readTextFile(path).pipe(map(text => ({ path, text })))),
+      map(({ path, text }) => ({ path, report: this.validateText(String(text ?? '')) })),
+      tap(({ report }) => {
+        if (!report.ok) {
+          const first = report.invalid.slice(0, 5).map(r => `line ${r.e.line} idx ${r.e.index}: ${r.v.issues.join(', ')}`).join('\n');
+          alert(`Invalid live_streams.sii format (\ninvalid entries: ${report.invalid.length}/${report.entries.length}\n)\n\nExamples:\n${first}`);
+        }
+      }),
+      filter(({ report }) => report.ok),
+      switchMap(({ path }) => this.util.importLiveStreamsFromPath(path, 'live_streams.sii')),
+      filter((res) => !!res && !res.canceled),
+      switchMap(() => this.util.findGameChannels('live_streams.sii')),
+      tap((res) => {
+        this.channels.set(res.channels ?? []);
+        this.total.set(res.total ?? res.channels?.length ?? 0);
+      })
+    ).subscribe({ error: (e) => console.error('Import failed', e) });
   }
 
-  async onExport() {
-    try {
-      const res = await firstValueFrom(this.util.exportLiveStreams('live_streams.sii', 'live_streams.sii'));
-      if (!res || res.canceled) return;
-      // Optional: simple visual feedback in the title line — could be replaced later
-      // For now we just log; you can wire a toast later
-      console.log('Exported to', res.destPath);
-    } catch (e) {
-      console.error('Export failed', e);
-    }
+  onExport() {
+    this.util.exportLiveStreams('live_streams.sii', 'live_streams.sii').pipe(
+      takeUntilDestroyed()
+    ).subscribe({
+      next: (res) => { if (!res?.canceled) console.log('Exported to', res.destPath); },
+      error: (e) => console.error('Export failed', e)
+    });
   }
 
-  async ngOnInit() {
+  ngOnInit() {
     this.loading.set(true);
-    const res = await firstValueFrom(this.util.findGameChannels('live_streams.sii'))
-      ?? { total: 0, filteredCount: 0, channels: [] };
-    this.channels.set(res.channels ?? []);
-    this.total.set(res.total ?? res.channels?.length ?? 0);
-    this.loading.set(false);
-    this.loaded.set(true);
+    this.util.findGameChannels('live_streams.sii').pipe(
+      takeUntilDestroyed(),
+      tap((res) => {
+        this.channels.set(res.channels ?? []);
+        this.total.set(res.total ?? res.channels?.length ?? 0);
+      }),
+      finalize(() => {
+        this.loading.set(false);
+        this.loaded.set(true);
+      })
+    ).subscribe();
   }
 }
