@@ -58,6 +58,7 @@ import { LiveStreamsUtilFactoryService } from './live-streams-util-factory.servi
                 <th class="py-2 px-3">Lang</th>
                 <th class="py-2 px-3">Bitrate</th>
                 <th class="py-2 px-3">Favorite</th>
+                <th class="py-2 px-3">Play</th>
               </tr>
             </thead>
             <tbody>
@@ -69,6 +70,28 @@ import { LiveStreamsUtilFactoryService } from './live-streams-util-factory.servi
                 <td class="py-2 px-3">{{ ch.lang }}</td>
                 <td class="py-2 px-3">{{ ch.bitrate }}</td>
                 <td class="py-2 px-3">{{ ch.favorite === '1' ? 'Yes' : 'No' }}</td>
+                <td class="py-2 px-3">
+                  <button type="button" (click)="playStream(ch)"
+                          [disabled]="loadingIndex() === ch.index"
+                          [class.bg-red-500]="playingIndex() === ch.index"
+                          [class.hover:bg-red-600]="playingIndex() === ch.index"
+                          [class.bg-orange-500]="errorIndex() === ch.index"
+                          [class.hover:bg-orange-600]="errorIndex() === ch.index"
+                          [class.bg-gray-900]="playingIndex() !== ch.index && loadingIndex() !== ch.index && errorIndex() !== ch.index"
+                          [class.hover:bg-black/80]="playingIndex() !== ch.index && loadingIndex() !== ch.index && errorIndex() !== ch.index"
+                          [class.bg-gray-400]="loadingIndex() === ch.index"
+                          class="inline-flex items-center justify-center gap-1 rounded text-white text-xs px-2 py-1 w-14">
+                    <svg *ngIf="loadingIndex() === ch.index" class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <svg *ngIf="errorIndex() === ch.index && loadingIndex() !== ch.index" class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span *ngIf="loadingIndex() !== ch.index && errorIndex() !== ch.index">{{ playingIndex() === ch.index ? 'Stop' : 'Play' }}</span>
+                    <span *ngIf="errorIndex() === ch.index && loadingIndex() !== ch.index">Retry</span>
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -83,6 +106,10 @@ export class LivestreamsContainerComponent implements OnInit {
   total = signal(0);
   loading = signal(true);
   loaded = signal(false);
+  playingIndex = signal<number | null>(null);
+  loadingIndex = signal<number | null>(null);
+  errorIndex = signal<number | null>(null);
+  private audioElement: HTMLAudioElement | null = null;
 
   // Helper kept in case we want chips later
   getGenreTags(genre: string | undefined | null): string[] {
@@ -90,6 +117,40 @@ export class LivestreamsContainerComponent implements OnInit {
       .split(',')
       .map(s => s.trim())
       .filter(Boolean);
+  }
+
+  playStream(channel: Channel) {
+    if (this.playingIndex() === channel.index) {
+      this.stopStream();
+      return;
+    }
+
+    if (this.audioElement) {
+      this.audioElement.pause();
+      this.audioElement = null;
+    }
+
+    this.playingIndex.set(null);
+    this.errorIndex.set(null);
+    this.loadingIndex.set(channel.index);
+    this.audioElement = new Audio(channel.url);
+    this.audioElement.play().then(() => {
+      this.loadingIndex.set(null);
+      this.playingIndex.set(channel.index);
+    }).catch(err => {
+      this.loadingIndex.set(null);
+      this.errorIndex.set(channel.index);
+      console.error('Failed to play stream:', err);
+      alert(`Unable to play stream: ${channel.name}`);
+    });
+  }
+
+  stopStream() {
+    if (this.audioElement) {
+      this.audioElement.pause();
+      this.audioElement = null;
+    }
+    this.playingIndex.set(null);
   }
 
   // --- Validation helpers (pure, focused) ---
