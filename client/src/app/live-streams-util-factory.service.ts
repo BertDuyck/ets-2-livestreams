@@ -39,8 +39,8 @@ export class LiveStreamsUtilFactoryService {
    * Find current channels parsed from live_streams.sii
    */
   findGameChannels(filePath = 'live_streams.sii', search?: string | SearchOptions): Observable<ChannelResult> {
-    return from((window as any).api?.findGameChannels?.(filePath, search)).pipe(
-      catchError(() => of(this.emptyResult))
+    return from((window as any).api.findGameChannels(filePath, search) as Promise<ChannelResult>).pipe(
+      catchError(() => of<ChannelResult>({ total: 0, filteredCount: 0, channels: [] }))
     );
   }
 
@@ -48,28 +48,28 @@ export class LiveStreamsUtilFactoryService {
    * Export an existing live_streams.sii to a user-selected directory.
    */
   exportLiveStreams(sourcePath = 'live_streams.sii', fileName = 'live_streams.sii'): Observable<{ canceled: boolean; destPath?: string }>{
-    return from((window as any).api?.exportLiveStreams?.(sourcePath, fileName)).pipe(
+    return from((window as any).api?.exportLiveStreams?.(sourcePath, fileName) as Promise<{ canceled: boolean; destPath?: string }>).pipe(
       catchError(() => of({ canceled: true as const }))
     );
   }
 
   /** Open file picker for import (returns path or null). */
   chooseImportFile(): Observable<string | null> {
-    return from((window as any).api?.chooseImportFile?.()).pipe(
+    return from((window as any).api?.chooseImportFile?.() as Promise<string>).pipe(
       catchError(() => of(null))
     );
   }
 
   /** Read a UTF-8 file into a string. */
   readTextFile(filePath: string): Observable<string> {
-    return from((window as any).api?.readTextFile?.(filePath)).pipe(
+    return from((window as any).api?.readTextFile?.(filePath) as Promise<string>).pipe(
       catchError(() => of(''))
     );
   }
 
   /** Replace the target live_streams.sii with a chosen source path. */
   importLiveStreamsFromPath(srcPath: string, targetPath = 'live_streams.sii'): Observable<{ canceled: boolean; srcPath?: string; destPath?: string }>{
-    return from((window as any).api?.importLiveStreamsFromPath?.(srcPath, targetPath)).pipe(
+    return from((window as any).api?.importLiveStreamsFromPath?.(srcPath, targetPath) as Promise<{ canceled: boolean; srcPath?: string; destPath?: string }>).pipe(
       catchError(() => of({ canceled: true as const }))
     );
   }
