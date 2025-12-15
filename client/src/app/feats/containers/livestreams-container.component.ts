@@ -34,6 +34,10 @@ export class LivestreamsContainerComponent implements OnInit {
   loadingIndex = signal<number | null>(null);
   errorIndex = signal<number | null>(null);
   private audioElement: HTMLAudioElement | null = null;
+  
+  // Add form related
+  showAddForm = signal(false);
+  newChannel: Partial<Channel> = {};
 
         favoriteChanged(index: number, event: Event) {
     const isChecked = (event.target as HTMLInputElement).checked;
@@ -151,12 +155,117 @@ export class LivestreamsContainerComponent implements OnInit {
     return this.modifiedFields().size > 0 || this.editingFields.size > 0;
   }
 
-  resetChanges() {
+    resetChanges() {
     if (confirm('Are you sure you want to discard all changes?')) {
       this.channels.set([...this.originalChannels]);
       this.modifiedFields.set(new Set());
       this.editingFields.clear();
     }
+  }
+
+  // Get the next available index (max current index + 1)
+  getNextIndex(): number {
+    const channels = this.channels();
+    if (channels.length === 0) return 0;
+    return Math.max(...channels.map(c => c.index)) + 1;
+  }
+
+  // Initialize the new channel form
+  initNewChannel() {
+    this.newChannel = {
+      index: this.getNextIndex(),
+      url: '',
+      name: '',
+      genre: '',
+      lang: 'EN',
+      bitrate: '',
+      favorite: '0'
+    };
+    this.showAddForm.set(true);
+  }
+
+  // Cancel adding a new channel
+  cancelAddChannel() {
+    this.showAddForm.set(false);
+    this.newChannel = {};
+  }
+
+    // Handle favorite checkbox change in add form
+  onNewChannelFavoriteChange(event: Event) {
+    const isChecked = (event.target as HTMLInputElement).checked;
+    this.newChannel.favorite = isChecked ? '1' : '0';
+  }
+
+  // Add the new channel
+  addChannel() {
+    // Validate required fields
+    if (!this.newChannel.url || !this.newChannel.name) {
+      alert('URL and Name are required fields');
+      return;
+    }
+
+    // Validate index
+    const maxIndex = this.getNextIndex();
+    const newIndex = this.newChannel.index ?? maxIndex;
+    if (newIndex < 0 || newIndex > maxIndex) {
+      alert(`Index must be between 0 and ${maxIndex}`);
+      return;
+    }
+
+    // Validate bitrate if provided
+    if (this.newChannel.bitrate && !/^[0-9]*$/.test(this.newChannel.bitrate)) {
+      alert('Bitrate must be a number');
+      return;
+    }
+
+    const channels = this.channels();
+    const newChannelData: Channel = {
+      index: newIndex,
+      url: this.newChannel.url || '',
+      name: this.newChannel.name || '',
+      genre: this.newChannel.genre || '',
+      lang: this.newChannel.lang || 'EN',
+      bitrate: this.newChannel.bitrate || '',
+      favorite: this.newChannel.favorite || '0'
+    };
+
+    // If inserting at an existing index, shift all subsequent entries up
+    const updatedChannels = [...channels];
+    const existingAtIndex = updatedChannels.find(c => c.index === newIndex);
+    
+    if (existingAtIndex) {
+      // Shift all channels at or after this index up by 1
+      updatedChannels.forEach(c => {
+        if (c.index >= newIndex) {
+          c.index++;
+        }
+      });
+    }
+
+    // Add the new channel
+    updatedChannels.push(newChannelData);
+    
+    // Sort by index
+    updatedChannels.sort((a, b) => a.index - b.index);
+    
+    // Update channels and track as modified
+    this.channels.set(updatedChannels);
+    
+    // Mark all shifted channels and the new channel as modified
+    const modifiedSet = new Set(this.modifiedFields());
+    updatedChannels.forEach(c => {
+      if (c.index >= newIndex) {
+        // Mark all fields of affected channels as modified
+        ['url', 'name', 'genre', 'lang', 'bitrate', 'favorite'].forEach(field => {
+          modifiedSet.add(`${c.index}-${field}`);
+        });
+      }
+    });
+    this.modifiedFields.set(modifiedSet);
+    
+    // Reset the form
+    this.showAddForm.set(false);
+    this.newChannel = {};
   }
 
   // Helper kept in case we want chips later
