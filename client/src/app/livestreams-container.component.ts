@@ -23,8 +23,14 @@ type Channel = {
           <h1 class="text-2xl font-semibold tracking-tight">Radio Editor</h1>
         </header>
 
-<div class="mb-3 text-sm text-gray-600" *ngIf="loaded()">
-Total channels: <span class="text-gray-900 font-medium">{{ total() }}</span>
+<div class="mb-3 flex items-center justify-between">
+          <div class="text-sm text-gray-600" *ngIf="loaded()">
+            Total channels: <span class="text-gray-900 font-medium">{{ total() }}</span>
+          </div>
+          <button type="button" (click)="onExport()"
+                  class="inline-flex items-center gap-2 rounded-md bg-gray-900 text-white text-sm px-3 py-1.5 hover:bg-black/80">
+            Export live_streams.sii
+          </button>
         </div>
 
         <div *ngIf="loading()" class="rounded-xl border border-white/5 bg-[var(--ets-panel)]/95 p-6">
@@ -79,6 +85,18 @@ export class LivestreamsContainerComponent implements OnInit {
       .split(',')
       .map(s => s.trim())
       .filter(Boolean);
+  }
+
+  async onExport() {
+    try {
+      const res = await (window as any).api?.exportLiveStreams?.('live_streams.sii', 'live_streams.sii');
+      if (!res || res.canceled) return;
+      // Optional: simple visual feedback in the title line — could be replaced later
+      // For now we just log; you can wire a toast later
+      console.log('Exported to', res.destPath);
+    } catch (e) {
+      console.error('Export failed', e);
+    }
   }
 
   async ngOnInit() {

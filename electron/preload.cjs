@@ -1,6 +1,6 @@
 // Preload runs in an isolated, privileged context. Keep the surface minimal.
-const { contextBridge } = require('electron');
-const { resolve } = require('node:path');
+const { contextBridge, ipcRenderer } = require('electron');
+const { resolve, join, isAbsolute } = require('node:path');
 const { pathToFileURL } = require('node:url');
 
 async function importModule(p) {
@@ -36,6 +36,22 @@ contextBridge.exposeInMainWorld('api', {
    */
   async markFavorite(filePath, indexOrIndexes, setFavorite = true) {
     const { markFavorite } = await importModule('../utils/live-streams/mark-favorite.js');
-    return markFavorite(filePath, indexOrIndexes, setFavorite);
+return markFavorite(filePath, indexOrIndexes, setFavorite);
+  },
+
+  /**
+   * Let user pick a target directory and copy a live_streams.sii there.
+   * @param {string} [sourcePath='live_streams.sii']
+   * @param {string} [fileName='live_streams.sii']
+   * @returns {Promise<{canceled:boolean, destPath?:string}>}
+   */
+  async exportLiveStreams(sourcePath = 'live_streams.sii', fileName = 'live_streams.sii') {
+    const destDir = await ipcRenderer.invoke('select-export-dir');
+    if (!destDir) return { canceled: true };
+    const fs = require('node:fs/promises');
+    const absSrc = isAbsolute(sourcePath) ? sourcePath : resolve(process.cwd(), sourcePath);
+    const destPath = join(destDir, fileName);
+    await fs.copyFile(absSrc, destPath);
+    return { canceled: false, destPath };
   }
 });
