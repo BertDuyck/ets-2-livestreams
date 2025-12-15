@@ -1,7 +1,7 @@
 SiiNunit
 {
  live_stream_def : _nameless.000.0000.0000 {
- stream_data: 125
+ stream_data: 130
  stream_data[0]: "http://ice-the.musicradio.com:80/LBC973MP3Low|LBC||EN|0|0"
  stream_data[1]: "http://media-ice.musicradio.com/SmoothLondonMP3|Smooth Radio|70s and 80s|EN|128|0"
  stream_data[2]: "http://ice.abradio.cz/faktor128.mp3|Hitradio Faktor|Adult Contemporary|CZE|128|0"
@@ -127,6 +127,11 @@ SiiNunit
  stream_data[122]: "http://fullspectrumradio.com:8000/|Full Spectrum Radio|Drum & Bass|EN||1"
  stream_data[123]: "http://trace.dnbradio.com:8000/dnbradio_main.mp3|DNBRadio|Drum & Bass|EN||1"
  stream_data[124]: "http://stream1.jungletrain.net:8000/|Jungletrain|Drum & Bass|EN||1"
+ stream_data[125]: "https://uk2.internet-radio.com/proxy/ambientradio?mp=/stream;|ambient radio|lounge|EN||1"
+ stream_data[126]: "https://streamssl.chilltrax.com:80/live|chilltrax|lounge|EN||1"
+ stream_data[127]: "https://cast.magicstreams.gr:9125/stream|Psyndora Chillout|chillout|EN||1"
+ stream_data[128]: "https://poploungecafe.stream.laut.fm/poploungecafe|poploungecafe|chillout|EN||1"
+ stream_data[129]: "https://channels.dinamo.fm/legacy-mp3|dinamo fm|chillout|EN||1"
 }
 
 }
