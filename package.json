@@ -6,6 +6,8 @@
     "channels:find": "node utils/live-streams/find-current-channels.js",
     "channels:find:help": "node utils/live-streams/find-current-channels.js --help",
     "channels:fav": "node utils/live-streams/mark-favorite.js",
-    "channels:fav:help": "node utils/live-streams/mark-favorite.js --help"
+    "channels:fav:help": "node utils/live-streams/mark-favorite.js --help",
+    "channels:public": "node utils/live-streams/fetch-public-stations.js",
+    "channels:public:help": "node utils/live-streams/fetch-public-stations.js --tag=lofi --limit=10"
   }
 }
