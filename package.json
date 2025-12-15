@@ -8,6 +8,16 @@
     "channels:fav": "node utils/live-streams/mark-favorite.js",
     "channels:fav:help": "node utils/live-streams/mark-favorite.js --help",
     "channels:public": "node utils/live-streams/fetch-public-stations.js",
-    "channels:public:help": "node utils/live-streams/fetch-public-stations.js --tag=lofi --limit=10"
+    "channels:public:help": "node utils/live-streams/fetch-public-stations.js --tag=lofi --limit=10",
+    "dev:ng": "npm --prefix client run start",
+    "dev:electron": "wait-on http://localhost:4200 && cross-env ANGULAR_DEV_URL=http://localhost:4200 electron electron/main.mjs",
+    "dev": "concurrently -k \"npm:dev:ng\" \"npm:dev:electron\"",
+    "build:renderer": "npm --prefix client run build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "cross-env": "^7.0.3",
+    "electron": "^32.3.3",
+    "wait-on": "^8.0.5"
   }
 }
