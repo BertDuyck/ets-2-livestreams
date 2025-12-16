@@ -1,5 +1,5 @@
-import { Component, OnInit, signal, inject } from '@angular/core';
-import { filter, finalize, map, switchMap, tap } from 'rxjs/operators';
+import { Component, OnInit, signal, inject, NgZone } from '@angular/core';
+import { catchError, exhaustMap, filter, finalize, map, switchMap, tap } from 'rxjs/operators';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -14,6 +14,7 @@ type Channel = {
 };
 
 import { LiveStreamsUtilFactoryService } from '../../live-streams-util-factory.service';
+import { defer, EMPTY, from, Subject } from 'rxjs';
 
 @Component({
   selector: 'app-livestreams-container',
@@ -23,6 +24,7 @@ import { LiveStreamsUtilFactoryService } from '../../live-streams-util-factory.s
 })
 export class LivestreamsContainerComponent implements OnInit {
   private readonly util = inject(LiveStreamsUtilFactoryService);
+  private readonly zone = inject(NgZone);
   channels = signal<Channel[]>([]);
   originalChannels: Channel[] = [];
   editingFields = new Map<string, string>(); // Temporary editing values
@@ -31,40 +33,35 @@ export class LivestreamsContainerComponent implements OnInit {
   loading = signal(true);
   loaded = signal(false);
   playingIndex = signal<number | null>(null);
+  playingStreamUrl = signal<string | null>(null);
   loadingIndex = signal<number | null>(null);
   errorIndex = signal<number | null>(null);
   private audioElement: HTMLAudioElement | null = null;
+  private readonly playStream$ = new Subject<Channel | null>();
   
   // Add form related
   showAddForm = signal(false);
   newChannel: Partial<Channel> = {};
 
-        favoriteChanged(index: number, event: Event) {
+  // constructor() {
+  //   this.playStream$.pipe(
+  //     exhaustMap(channel => {
+  //     })
+  //   ).subscribe();
+  // }
+
+  favoriteChanged(index: number, event: Event) {
     const isChecked = (event.target as HTMLInputElement).checked;
     const channels = this.channels();
     const channel = channels.find(c => c.index === index);
     if (!channel) return;
     const updatedChannels = channels.map(c => c.index === index ? { ...c, favorite: isChecked ? '1' : '0' } : c);
     this.channels.set(updatedChannels);
-    
-    // Track modification for favorite field
-    const original = this.originalChannels.find(c => c.index === index);
-    if (original) {
-      const fieldKey = `${index}-favorite`;
-      const modifiedSet = new Set(this.modifiedFields());
-      
-      const newValue = isChecked ? '1' : '0';
-      if (original.favorite !== newValue) {
-        modifiedSet.add(fieldKey);
-      } else {
-        modifiedSet.delete(fieldKey);
-      }
-      
-      this.modifiedFields.set(modifiedSet);
-    }
+
+    this.onSave();
   }
 
-        // Store temporary edit value without updating the signal
+  // Store temporary edit value without updating the signal
   onFieldEdit(index: number, field: keyof Channel, event: Event) {
     const value = (event.target as HTMLInputElement).value;
     const fieldKey = `${index}-${field}`;
@@ -110,7 +107,7 @@ export class LivestreamsContainerComponent implements OnInit {
     
     // Validate based on field type
     if (field === 'bitrate' && value !== '' && !/^[0-9]+$/.test(value)) {
-      alert('Invalid bitrate. Please enter only numbers.');
+      this.showAlert('Invalid bitrate. Please enter only numbers.');
       this.editingFields.delete(fieldKey);
       return;
     }
@@ -120,20 +117,8 @@ export class LivestreamsContainerComponent implements OnInit {
     );
     this.channels.set(updatedChannels);
     this.editingFields.delete(fieldKey); // Clear the editing value
-    
-    // Track modifications
-    const original = this.originalChannels.find(c => c.index === index);
-    if (original) {
-      const modifiedSet = new Set(this.modifiedFields());
-      
-      if (original[field] !== value) {
-        modifiedSet.add(fieldKey);
-      } else {
-        modifiedSet.delete(fieldKey);
-      }
-      
-      this.modifiedFields.set(modifiedSet);
-    }
+
+    this.onSave();
   }
 
     // Check if a field has pending changes
@@ -155,12 +140,24 @@ export class LivestreamsContainerComponent implements OnInit {
     return this.modifiedFields().size > 0 || this.editingFields.size > 0;
   }
 
+  // Check if channels have been added or removed
+  hasStructuralChanges(): boolean {
+    const currentChannels = this.channels();
+    if (currentChannels.length !== this.originalChannels.length) {
+      return true;
+    }
+    // Check if any channel has a deletion marker
+    return Array.from(this.modifiedFields()).some(field => field.endsWith('-deleted'));
+  }
+
     resetChanges() {
     if (confirm('Are you sure you want to discard all changes?')) {
       this.channels.set([...this.originalChannels]);
       this.modifiedFields.set(new Set());
       this.editingFields.clear();
     }
+      
+    this.util.refocusMainWindow();
   }
 
   // Get the next available index (max current index + 1)
@@ -196,11 +193,82 @@ export class LivestreamsContainerComponent implements OnInit {
     this.newChannel.favorite = isChecked ? '1' : '0';
   }
 
+  getChannelByIndex(index: number): Channel | undefined {
+    return this.channels().find(c => c.index === index);
+  }
+
+    // Remove a channel and update indices
+  removeChannel(index: number) {
+    if (!confirm(`Are you sure you want to remove the channel at index ${index}?`)) {
+      this.util.refocusMainWindow();
+
+      return;
+    }
+
+    if (this.playingStreamUrl() === this.getChannelByIndex(index)?.url) {
+      this.stopStream();
+    }
+
+    const channels = this.channels();
+    const updatedChannels = channels
+      .filter(c => c.index !== index)
+      .map(c => {
+        // Decrement index for all channels after the removed one
+        if (c.index > index) {
+          return { ...c, index: c.index - 1 };
+        }
+        return c;
+      });
+    
+    // Update channels
+    this.channels.set(updatedChannels);
+    
+    // Mark all affected channels as modified
+    const modifiedSet = new Set(this.modifiedFields());
+    
+    // Mark the removed channel's index as deleted (we'll need this for tracking)
+    // Add a special marker for deletion
+    modifiedSet.add(`${index}-deleted`);
+    
+    // Mark all shifted channels as modified
+    updatedChannels.forEach(c => {
+      const originalChannel = this.originalChannels.find(oc => 
+        // Find by original position - channels after the deleted one were at index+1
+        oc.index === (c.index >= index ? c.index + 1 : c.index)
+      );
+      
+      if (originalChannel && originalChannel.index > index) {
+        // This channel was shifted, mark all its fields as modified
+        ['url', 'name', 'genre', 'lang', 'bitrate', 'favorite'].forEach(field => {
+          modifiedSet.add(`${c.index}-${field}`);
+        });
+      }
+    });
+    
+    this.modifiedFields.set(modifiedSet);
+    
+    // Clear any editing fields for the removed channel and shifted channels
+    const keysToRemove: string[] = [];
+    this.editingFields.forEach((_, key) => {
+      const [indexStr] = key.split('-');
+      const editIndex = parseInt(indexStr);
+      if (editIndex >= index) {
+        keysToRemove.push(key);
+      }
+    });
+    keysToRemove.forEach(key => this.editingFields.delete(key));
+
+    this.errorIndex.set(null);
+
+    this.util.refocusMainWindow();
+    this.onSave();
+  }
+
   // Add the new channel
   addChannel() {
     // Validate required fields
     if (!this.newChannel.url || !this.newChannel.name) {
-      alert('URL and Name are required fields');
+      this.showAlert('URL and Name are required fields');
       return;
     }
 
@@ -208,13 +276,13 @@ export class LivestreamsContainerComponent implements OnInit {
     const maxIndex = this.getNextIndex();
     const newIndex = this.newChannel.index ?? maxIndex;
     if (newIndex < 0 || newIndex > maxIndex) {
-      alert(`Index must be between 0 and ${maxIndex}`);
+      this.showAlert(`Index must be between 0 and ${maxIndex}`);
       return;
     }
 
     // Validate bitrate if provided
     if (this.newChannel.bitrate && !/^[0-9]*$/.test(this.newChannel.bitrate)) {
-      alert('Bitrate must be a number');
+      this.showAlert('Bitrate must be a number');
       return;
     }
 
@@ -262,10 +330,17 @@ export class LivestreamsContainerComponent implements OnInit {
       }
     });
     this.modifiedFields.set(modifiedSet);
-    
+
+    if (this.playingStreamUrl() === this.newChannel.url) {
+      this.stopStream();
+      this.playStream(newChannelData);
+    }
+
     // Reset the form
     this.showAddForm.set(false);
     this.newChannel = {};
+
+    this.onSave();
   }
 
   // Helper kept in case we want chips later
@@ -276,38 +351,108 @@ export class LivestreamsContainerComponent implements OnInit {
       .filter(Boolean);
   }
 
-  playStream(channel: Channel) {
-    if (this.playingIndex() === channel.index) {
+  testStreamUrl(url: string) {
+    if (!url) {
+      this.showAlert('Please enter a stream URL to test.');
+      return;
+    }
+
+    if (this.playingStreamUrl() === url) {
       this.stopStream();
       return;
     }
 
+    this.stopStream();
+    this.loadingIndex.set(-1); // Special index for test
+    this.errorIndex.set(null);
+    this.audioElement = new Audio(url); 
     if (this.audioElement) {
-      this.audioElement.pause();
-      this.audioElement = null;
+      defer(() => this.audioElement ? this.audioElement.play().catch() : Promise.resolve()).pipe(
+        catchError(err => {
+          if (this.audioElement?.src === url) {
+            this.loadingIndex.set(null);
+            this.errorIndex.set(-1);
+            console.error('Failed to play test stream:', err);
+            return EMPTY;
+          }
+          return EMPTY;
+        })
+      ).subscribe(() => {
+        this.loadingIndex.set(null);
+        this.playingStreamUrl.set(url);
+      });
+    }
+  }
+
+  playStream(channel: Channel) {
+    this.loadingIndex.set(channel.index);
+    
+    if (this.playingStreamUrl() === channel.url) {
+      this.stopStream();
+      this.loadingIndex.set(null);
+      return;
     }
 
-    this.playingIndex.set(null);
+    this.stopStream();
+
     this.errorIndex.set(null);
-    this.loadingIndex.set(channel.index);
     this.audioElement = new Audio(channel.url);
-    this.audioElement.play().then(() => {
-      this.loadingIndex.set(null);
-      this.playingIndex.set(channel.index);
-    }).catch(err => {
-      this.loadingIndex.set(null);
-      this.errorIndex.set(channel.index);
-      console.error('Failed to play stream:', err);
-      alert(`Unable to play stream: ${channel.name}`);
-    });
+
+    if (this.audioElement) {
+      defer(() => this.audioElement ? this.audioElement.play().catch() : Promise.resolve()).pipe(
+        catchError(err => {
+          if (this.audioElement?.src === channel.url) {
+          // this.showAlert(`Unable to play stream: ${channel.name}, ${this.audioElement?.src} ${channel.url}`);
+            this.loadingIndex.set(null);
+            this.errorIndex.set(channel.index);
+            console.error('Failed to play stream:', err);
+
+            return EMPTY;
+          }
+          // this.showAlert(`Unable to play stream: ${channel.name}`);
+          return EMPTY;
+        })
+      ).subscribe(() => {
+        this.loadingIndex.set(null);
+        this.playingStreamUrl.set(channel.url);
+      });
+    }
   }
 
   stopStream() {
     if (this.audioElement) {
+      console.log('Stopping stream', this.audioElement.src, this.audioElement.networkState);
       this.audioElement.pause();
+
       this.audioElement = null;
     }
-    this.playingIndex.set(null);
+    this.playingStreamUrl.set(null);
+  }
+
+  showAlert(message: string) {
+    this.zone.run(() => {
+      alert(message);
+      this.util.refocusMainWindow();
+    }); 
+  }
+
+  sortChannelsByField(field: keyof Channel) {
+    // Apply any pending edits first
+    if(!this.confirmPendingEdits()) {
+      return;
+    }
+
+    const channels = this.channels();
+    const sorted = [...channels].sort((a, b) => {
+      const valA = String(a[field] || '').toLowerCase();
+      const valB = String(b[field] || '').toLowerCase();
+      return valA.localeCompare(valB);
+    });
+    const remapNumbers = sorted.map((ch, idx) => ({ ...ch, index: idx }));
+    this.channels.set(remapNumbers);
+
+    this.onSave();
+    // this.util.refocusMainWindow();
   }
 
   // --- Validation helpers (pure, focused) ---
@@ -315,15 +460,19 @@ export class LivestreamsContainerComponent implements OnInit {
     const count = (payload.match(/\|/g) || []).length;
     return count === expected;
   }
+
   private hasNoWhitespaceAroundPipes(payload: string): boolean {
     return !(/[\s]\|/.test(payload) || /\|[\s]/.test(payload));
   }
+
   private isValidFavorite(value: string): boolean {
     return value === '0' || value === '1';
   }
+
   private isValidBitrate(value: string): boolean {
     return value === '' || /^[0-9]+$/.test(value);
   }
+
   private parseEntries(text: string): Array<{ line: number; index: number; payload: string; }>{
     const lines = text.split(/\r?\n/);
     const entryRe = /^\s*stream_data\[(\d+)\]:\s*"([^"]*)"/;
@@ -334,6 +483,7 @@ export class LivestreamsContainerComponent implements OnInit {
     }
     return entries.sort((a,b) => a.index - b.index);
   }
+
   private validateEntry(payload: string) {
     const issues: string[] = [];
     if (!this.hasCorrectPipeCount(payload)) issues.push('PIPE_COUNT: expected 5 pipes (6 fields)');
@@ -348,6 +498,7 @@ export class LivestreamsContainerComponent implements OnInit {
     }
     return { ok: issues.length === 0, issues, fieldsCount: parts.length };
   }
+
   private validateText(text: string) {
     const entries = this.parseEntries(text);
     const results = entries.map(e => ({ e, v: this.validateEntry(e.payload) }));
@@ -360,7 +511,7 @@ export class LivestreamsContainerComponent implements OnInit {
       filter((p): p is string => !!p),
       switchMap((path) => this.util.readTextFile(path).pipe(map(text => ({ path, text })))),
       map(({ path, text }) => ({ path, report: this.validateText(String(text ?? '')) })),
-tap(({ report }) => {
+      tap(({ report }) => {
         if (!report.ok) {
           const formatInvalidPreview = (items: Array<{ e: { line: number; index: number }; v: { issues: string[] } }>) =>
             items
@@ -369,7 +520,7 @@ tap(({ report }) => {
               .join('\n');
 
           const first = formatInvalidPreview(report.invalid);
-          alert(`Invalid live_streams.sii format (\ninvalid entries: ${report.invalid.length}/${report.entries.length}\n)\n\nExamples:\n${first}`);
+          this.showAlert(`Invalid live_streams.sii format (\ninvalid entries: ${report.invalid.length}/${report.entries.length}\n)\n\nExamples:\n${first}`);
         }
       }),
       filter(({ report }) => report.ok),
@@ -386,10 +537,9 @@ tap(({ report }) => {
     ).subscribe({ error: (e) => console.error('Import failed', e) });
   }
 
-        onSave() {
-    // Apply any pending edits first
+  confirmPendingEdits(): boolean {
     if (this.editingFields.size > 0) {
-      const confirmApply = confirm('You have pending edits. Apply them before saving?');
+      const confirmApply = confirm('You have some remaining pending edits. Apply them before saving?');
       if (confirmApply) {
         // Apply all pending changes
         for (const [fieldKey, value] of this.editingFields.entries()) {
@@ -402,9 +552,21 @@ tap(({ report }) => {
           this.channels.set(updatedChannels);
         }
         this.editingFields.clear();
+
+        this.util.refocusMainWindow();
       } else {
-        return; // Don't save if user cancels
+        this.util.refocusMainWindow();
+        return false; // Don't save if user cancels
       }
+    }
+        
+    return true;
+  }
+
+  onSave() {
+    // Apply any pending edits first
+    if(!this.confirmPendingEdits()) {
+      return;
     }
 
     // Save the current (possibly modified) channel data to the original file
@@ -413,19 +575,19 @@ tap(({ report }) => {
       next: (res) => { 
         if (res?.success) {
           console.log('Changes saved successfully');
-          alert('Changes saved successfully to live_streams.sii');
+          // this.showAlert('Changes saved successfully to live_streams.sii');
           // Update original channels and clear modifications tracking
           this.originalChannels = JSON.parse(JSON.stringify(currentChannels));
           this.modifiedFields.set(new Set());
           this.editingFields.clear();
         } else {
           console.error('Save failed:', res?.error);
-          alert(`Failed to save changes: ${res?.error || 'Unknown error'}`);
+          this.showAlert(`Failed to save changes: ${res?.error || 'Unknown error'}`);
         }
       },
       error: (e) => {
         console.error('Save failed', e);
-        alert('Save failed. Please check the console for details.');
+        this.showAlert('Save failed. Please check the console for details.');
       }
     });
   }
@@ -437,12 +599,12 @@ tap(({ report }) => {
       next: (res) => { 
         if (!res?.canceled) {
           console.log('Exported to', res.destPath);
-          alert(`Successfully exported live_streams.sii with updated favorites to:\n${res.destPath}`);
+          this.showAlert(`Successfully exported live_streams.sii with updated favorites to:\n${res.destPath}`);
         }
       },
       error: (e) => {
         console.error('Export failed', e);
-        alert('Export failed. Please check the console for details.');
+        this.showAlert('Export failed. Please check the console for details.');
       }
     });
   }

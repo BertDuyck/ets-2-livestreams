@@ -271,6 +271,14 @@ contextBridge.exposeInMainWorld('api', {
     return ipcRenderer.invoke('select-import-file');
   },
 
+  showAlert(message) {
+    ipcRenderer.send('show-alert', message);
+  },
+
+  refocusMainWindow() {
+    ipcRenderer.send('refocus-main-window');
+  },
+
   /** Read a text file (utf8). */
   async readTextFile(filePath) {
     try {
@@ -373,34 +381,54 @@ contextBridge.exposeInMainWorld('api', {
         await Promise.allSettled(toDelete.map(f => fs.unlink(f.path)));
       } catch {}
 
-      // Parse and update the content
+      // Parse the content to preserve non-stream_data lines and structure
       const lines = originalContent.split(/\r?\n/);
       const entryRegex = /^(\s*stream_data\[(\d+)\]:\s*")([^"]*)(".*)?$/;
       const updatedLines = [];
       
-      // Create a map of channels by index for quick lookup
-      const channelMap = new Map(channels.map(ch => [ch.index, ch]));
+      // Sort channels by their current index to maintain order
+      const sortedChannels = [...channels].sort((a, b) => a.index - b.index);
+      
+      // Normalize indices to be sequential starting from 0
+      const normalizedChannels = sortedChannels.map((ch, idx) => ({
+        ...ch,
+        index: idx
+      }));
+      
+      let nextIndexToWrite = 0;
+      const totalChannels = normalizedChannels.length;
       
       for (const line of lines) {
         const match = line.match(entryRegex);
         if (match) {
-          const prefix = match[1];
-          const index = Number(match[2]);
+          // This is a stream_data line
+          const originalIndex = Number(match[2]);
+          const originalPrefix = match[1];
           const suffix = match[4] || '"';
           
-          const channel = channelMap.get(index);
-          if (channel) {
-            // Format the channel data with pipe delimiters
+          // Check if we have channels to write at this position
+          if (nextIndexToWrite < totalChannels) {
+            const channel = normalizedChannels[nextIndexToWrite];
+            // Write the channel with sequential index
+            const prefix = originalPrefix.replace(/\[\d+\]/, `[${nextIndexToWrite}]`);
             const payload = `${channel.url}|${channel.name}|${channel.genre}|${channel.lang}|${channel.bitrate}|${channel.favorite}`;
             updatedLines.push(`${prefix}${payload}${suffix}`);
-          } else {
-            // Keep original line if no update for this index
-            updatedLines.push(line);
+            nextIndexToWrite++;
           }
+          // If originalIndex is beyond our channel count, skip this line (deletion case)
         } else {
           // Keep non-stream_data lines as-is
           updatedLines.push(line);
         }
+      }
+      
+      // Add any remaining channels that weren't written yet (addition case)
+      // This happens when we have more channels than original file had stream_data lines
+      for (let i = nextIndexToWrite; i < totalChannels; i++) {
+        const channel = normalizedChannels[i];
+        const payload = `${channel.url}|${channel.name}|${channel.genre}|${channel.lang}|${channel.bitrate}|${channel.favorite}`;
+        // Use the same indentation as other stream_data lines
+        updatedLines.push(` stream_data[${i}]: "${payload}"`);
       }
       
       // Write back to the original file

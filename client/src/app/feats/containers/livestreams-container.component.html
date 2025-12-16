@@ -1,11 +1,11 @@
-<section class="h-screen flex flex-col p-6">
-      <div class="mx-auto max-w-6xl w-full flex flex-col h-full">
-<header class="flex items-center gap-3 mb-3 rounded-md bg-gray-100 px-3 py-2 border border-gray-200">
+<section class="h-screen flex flex-col p-3 lg:p-4">
+      <div class="mx-auto w-full max-w-full lg:max-w-6xl xl:max-w-7xl flex flex-col h-full">
+        <header class="flex items-center gap-3 mb-3 rounded-md bg-gray-100 px-3 py-2 border border-gray-200">
           <div class="h-6 w-1.5 rounded bg-[var(--ets-accent)]"></div>
           <h1 class="text-2xl font-semibold tracking-tight">Radio Editor</h1>
-        </header>
+    </header>
 
-<div class="mb-3 flex items-center justify-between">
+    <div class="mb-3 flex items-center justify-between">
           <div class="flex items-center gap-3">
             <div class="text-sm text-gray-600" *ngIf="loaded()">
               Total channels: <span class="text-gray-900 font-medium">{{ total() }}</span>
@@ -13,8 +13,23 @@
             <div *ngIf="hasChanges()" class="text-sm text-amber-600 font-medium">
               ⚠️ Unsaved changes
             </div>
+            <!-- <button type="button" (click)="onSave()"
+                    [disabled]="!hasChanges()"
+                    [class.bg-green-600]="hasChanges()"
+                    [class.hover:bg-green-700]="hasChanges()"
+                    [class.bg-gray-400]="!hasChanges()"
+                    [class.cursor-not-allowed]="!hasChanges()"
+                    class="inline-flex items-center gap-2 rounded-md text-white text-sm px-3 py-1.5">
+              Save Changes
+            </button> -->
+            <button type="button" (click)="resetChanges()"
+                    *ngIf="hasChanges()"
+                    class="inline-flex items-center gap-2 rounded-md border border-red-300 bg-white text-red-600 text-sm px-3 py-1.5 hover:bg-red-50">
+              Reset Changes
+            </button>
           </div>
-                              <div class="flex items-center gap-2">
+
+          <div class="flex items-center gap-2">
             <button type="button" (click)="initNewChannel()"
                     class="inline-flex items-center gap-1 rounded-md bg-blue-600 text-white text-sm px-3 py-1.5 hover:bg-blue-700">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -26,23 +41,9 @@
                     class="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white text-gray-900 text-sm px-3 py-1.5 hover:bg-gray-50">
               Import live_streams.sii
             </button>
-                        <button type="button" (click)="onSave()"
-                    [disabled]="!hasChanges()"
-                    [class.bg-green-600]="hasChanges()"
-                    [class.hover:bg-green-700]="hasChanges()"
-                    [class.bg-gray-400]="!hasChanges()"
-                    [class.cursor-not-allowed]="!hasChanges()"
-                    class="inline-flex items-center gap-2 rounded-md text-white text-sm px-3 py-1.5">
-              Save Changes
-            </button>
-            <button type="button" (click)="resetChanges()"
-                    *ngIf="hasChanges()"
-                    class="inline-flex items-center gap-2 rounded-md border border-red-300 bg-white text-red-600 text-sm px-3 py-1.5 hover:bg-red-50">
-              Reset Changes
-            </button>
             <button type="button" (click)="onExport()"
                     class="inline-flex items-center gap-2 rounded-md bg-gray-900 text-white text-sm px-3 py-1.5 hover:bg-black/80">
-              Export to File
+              Export livestreams.sii
             </button>
           </div>
         </div>
@@ -108,13 +109,34 @@
               </div>
             </div>
             <div class="flex items-center gap-2">
-                            <label class="flex items-center gap-1">
+              <label class="flex items-center gap-1">
                 <input type="checkbox" 
                        [checked]="newChannel.favorite === '1'"
                        (change)="onNewChannelFavoriteChange($event)"
                        class="h-4 w-4 text-blue-600 border-gray-300 rounded">
                 <span class="text-xs font-medium text-gray-700">Favorite</span>
               </label>
+              <button type="button" (click)="testStreamUrl(newChannel.url || '')"
+                          [disabled]="loadingIndex() === -1 || !newChannel.url"
+                          [class.bg-red-500]="playingStreamUrl() === newChannel.url"
+                          [class.hover:bg-red-600]="playingStreamUrl() === newChannel.url"
+                          [class.bg-orange-500]="errorIndex() === -1"
+                          [class.hover:bg-orange-600]="errorIndex() === -1"
+                          [class.bg-gray-900]="playingStreamUrl() !== newChannel.url && loadingIndex() !== -1 && errorIndex() !== -1"
+                          [class.hover:bg-black/80]="playingStreamUrl() !== newChannel.url && loadingIndex() !== -1 && errorIndex() !== -1"
+                          [class.bg-gray-400]="loadingIndex() === -1"
+                          class="inline-flex items-center justify-center gap-1 rounded text-white text-xs px-1 py-1 w-12">
+                    <svg *ngIf="loadingIndex() === -1" class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <svg *ngIf="errorIndex() === -1 && loadingIndex() !== -1" class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span *ngIf="loadingIndex() !== -1 && errorIndex() !== -1">{{ playingStreamUrl() === newChannel.url ? 'Stop' : 'Play' }}</span>
+                    <span *ngIf="errorIndex() === -1 && loadingIndex() !== -1">Retry</span>
+              </button>
+
               <button type="button" (click)="addChannel()"
                       class="inline-flex items-center gap-1 rounded-md bg-green-600 text-white text-sm px-3 py-1.5 hover:bg-green-700">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -131,33 +153,34 @@
         </div>
 
         <div *ngIf="!loading()" class="flex-1 overflow-hidden rounded-md border border-gray-200 bg-white text-black flex flex-col">
-                    <div class="overflow-auto flex-1">
-            <table class="min-w-full text-sm table-auto border-collapse">
-              <thead class="text-left bg-gray-50 sticky top-0 z-10">
+          <div class="overflow-x-auto overflow-y-auto flex-1">
+            <table class="min-w-[900px] w-full text-sm table-auto border-collapse">
+                            <thead class="text-left bg-gray-50 sticky top-0 z-10">
                 <tr class="border-b border-gray-200">
-                <th class="py-2 px-3">#</th>
-                <th class="py-2 px-3">Name</th>
-                <th class="py-2 px-3">URL</th>
-                <th class="py-2 px-3">Genre</th>
-                <th class="py-2 px-3">Lang</th>
-                <th class="py-2 px-3">Bitrate</th>
-                <th class="py-2 px-3">Favorite</th>
-                <th class="py-2 px-3">Play</th>
+                                <th class="py-2 px-2 w-12">#</th>
+                <th class="py-2 px-2 min-w-[150px]">Name <a href="#" class="text-blue-500" (click)="sortChannelsByField('name')">(Sort)</a></th>
+                <th class="py-2 px-2 min-w-[200px]">URL</th>
+                <th class="py-2 px-2 min-w-[100px]">Genre <a href="#" class="text-blue-500" (click)="sortChannelsByField('genre')">(Sort)</a></th>
+                <th class="py-2 px-2 w-16">Lang</th>
+                <th class="py-2 px-2 w-20">Bitrate</th>
+                <th class="py-2 px-2 w-20">Favorite</th>
+                <th class="py-2 px-2 w-16">Play</th>
+                <th class="py-2 px-2 w-16">Actions</th>
               </tr>
             </thead>
             <tbody>
-                                                        <tr *ngFor="let ch of channels()" class="border-b border-gray-200">
-                <td class="py-2 px-3 text-gray-600">{{ ch.index }}</td>
+              <tr *ngFor="let ch of channels()" class="border-b border-gray-200">
+                <td class="py-2 px-2 text-gray-600 text-xs">{{ ch.index }}</td>
                 <td class="py-1 px-2">
                   <div class="flex items-center gap-1">
-                                        <input type="text" 
+                    <input type="text" 
                            [value]="getFieldValue(ch.index, 'name')" 
                            (input)="onFieldEdit(ch.index, 'name', $event)"
                            (keydown)="onFieldKeydown(ch.index, 'name', $event)"
                            [class.bg-yellow-50]="isFieldModified(ch.index, 'name')"
                            placeholder="Unnamed Station"
                            class="flex-1 px-1 py-1 bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded">
-                                        <button *ngIf="hasFieldPendingChanges(ch.index, 'name')" 
+                    <button *ngIf="hasFieldPendingChanges(ch.index, 'name')" 
                             (click)="applyFieldChange(ch.index, 'name')"
                             title="Apply change"
                             class="text-blue-600 hover:text-blue-700 p-0.5">
@@ -242,23 +265,23 @@
                     </button>
                   </div>
                 </td>
-                                                <td class="py-2 px-3">
+                                                                <td class="py-1 px-2 text-center">
                   <input type="checkbox" 
                          [checked]="ch.favorite === '1'"
                          (change)="favoriteChanged(ch.index, $event)"
                          class="h-4 w-4 text-[var(--ets-accent)] border-gray-300 rounded">
                 </td>
-                <td class="py-2 px-3">
+                                <td class="py-1 px-1">
                   <button type="button" (click)="playStream(ch)"
                           [disabled]="loadingIndex() === ch.index"
-                          [class.bg-red-500]="playingIndex() === ch.index"
-                          [class.hover:bg-red-600]="playingIndex() === ch.index"
+                          [class.bg-red-500]="playingStreamUrl() === channel.url"
+                          [class.hover:bg-red-600]="playingStreamUrl() === ch.url"
                           [class.bg-orange-500]="errorIndex() === ch.index"
                           [class.hover:bg-orange-600]="errorIndex() === ch.index"
-                          [class.bg-gray-900]="playingIndex() !== ch.index && loadingIndex() !== ch.index && errorIndex() !== ch.index"
-                          [class.hover:bg-black/80]="playingIndex() !== ch.index && loadingIndex() !== ch.index && errorIndex() !== ch.index"
+                          [class.bg-gray-900]="playingStreamUrl() !== ch.url && loadingIndex() !== ch.index && errorIndex() !== ch.index"
+                          [class.hover:bg-black/80]="playingStreamUrl() !== ch.url && loadingIndex() !== ch.index && errorIndex() !== ch.index"
                           [class.bg-gray-400]="loadingIndex() === ch.index"
-                          class="inline-flex items-center justify-center gap-1 rounded text-white text-xs px-2 py-1 w-14">
+                          class="inline-flex items-center justify-center gap-1 rounded text-white text-xs px-1 py-1 w-12">
                     <svg *ngIf="loadingIndex() === ch.index" class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -268,6 +291,15 @@
                     </svg>
                     <span *ngIf="loadingIndex() !== ch.index && errorIndex() !== ch.index">{{ playingIndex() === ch.index ? 'Stop' : 'Play' }}</span>
                     <span *ngIf="errorIndex() === ch.index && loadingIndex() !== ch.index">Retry</span>
+                  </button>
+                </td>
+                                <td class="py-1 px-1">
+                  <button type="button" (click)="removeChannel(ch.index)"
+                          title="Remove channel"
+                          class="inline-flex items-center justify-center p-0.5 rounded text-red-600 hover:bg-red-50 hover:text-red-700">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
                   </button>
                 </td>
               </tr>

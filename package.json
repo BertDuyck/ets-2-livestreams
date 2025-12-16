@@ -28,7 +28,7 @@
     "wait-on": "^8.0.5"
   },
   "main": "electron/main.mjs",
-  "build": {
+    "build": {
     "appId": "com.dukes-ets-editor.app",
     "productName": "Dukes ETS Editor",
     "files": [
@@ -37,6 +37,10 @@
       "utils/**",
       "package.json",
       "live_streams.sii"
+    ],
+    "asarUnpack": [
+      "live_streams.sii",
+      "utils/**/*.js"
     ],
     "directories": {
       "buildResources": "assets"

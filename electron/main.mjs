@@ -7,7 +7,7 @@ const isDev = !app.isPackaged;
 
 function createWindow() {
   const win = new BrowserWindow({
-    width: 1200,
+    width: 1300,
     height: 800,
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
@@ -62,6 +62,14 @@ app.whenReady().then(() => {
     return res.filePaths[0];
   });
 
+  ipcMain.on('refocus-main-window', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) {
+      win.blur();
+      win.focus();  // Or just win.focus() — blur+focus often more reliable
+    }
+  });
+  
   createWindow();
 });
 

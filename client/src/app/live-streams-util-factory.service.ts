@@ -74,6 +74,10 @@ export class LiveStreamsUtilFactoryService {
     );
   }
 
+  refocusMainWindow(): void {
+    (window as any).api?.refocusMainWindow?.();
+  }
+
   /** Open file picker for import (returns path or null). */
   chooseImportFile(): Observable<string | null> {
     return from((window as any).api?.chooseImportFile?.() as Promise<string>).pipe(
