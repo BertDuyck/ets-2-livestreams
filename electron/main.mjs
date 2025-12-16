@@ -49,6 +49,14 @@ app.whenReady().then(() => {
   // IPC: get app path
   ipcMain.handle('get-app-path', () => app.getAppPath());
 
+  // IPC: get documents path
+  ipcMain.handle('get-documents-path', () => app.getPath('documents'));
+  // IPC: get ets2 path
+  ipcMain.handle('get-ets2-path', () => {
+      const documentsPath = app.getPath('documents');
+      return join(documentsPath, 'Euro Truck Simulator 2');
+  });
+
   // IPC: choose import file (live_streams.sii)
   ipcMain.handle('select-import-file', async () => {
     const res = await dialog.showOpenDialog({

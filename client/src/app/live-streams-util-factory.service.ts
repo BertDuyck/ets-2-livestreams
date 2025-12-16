@@ -74,6 +74,20 @@ export class LiveStreamsUtilFactoryService {
     );
   }
 
+  exportLiveStreamsWithDataToEuroTruckSimulator(channels: Array<{
+      index: number;
+      url: string;
+      name: string;
+      genre: string;
+      lang: string;
+      bitrate: string;
+      favorite: string;
+    }>): Observable<{ canceled: boolean; destPath?: string }> {
+    return from((window as any).api?.exportLiveStreamsWithDataToEuroTruckSimulator?.(channels) as Promise<{ canceled: boolean; destPath?: string }>).pipe(
+      catchError(() => of({ canceled: true as const }))
+    );
+  }
+
   refocusMainWindow(): void {
     (window as any).api?.refocusMainWindow?.();
   }
@@ -89,6 +103,12 @@ export class LiveStreamsUtilFactoryService {
   readTextFile(filePath: string): Observable<string> {
     return from((window as any).api?.readTextFile?.(filePath) as Promise<string>).pipe(
       catchError(() => of(''))
+    );
+  }
+
+  importLiveStreamsFromEuroTruckSimulator(targetPath = 'live_streams.sii'): Observable<{ canceled: boolean; srcPath?: string; destPath?: string }>{
+    return from((window as any).api?.importLiveStreamsFromEuroTruckSimulator?.(targetPath) as Promise<{ canceled: boolean; srcPath?: string; destPath?: string }>).pipe(
+      catchError(() => of({ canceled: true as const }))
     );
   }
 

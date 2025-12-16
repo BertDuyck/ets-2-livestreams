@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, inject, NgZone } from '@angular/core';
+import { Component, OnInit, signal, inject, NgZone, computed } from '@angular/core';
 import { catchError, exhaustMap, filter, finalize, map, switchMap, tap } from 'rxjs/operators';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -25,8 +25,11 @@ import { defer, EMPTY, from, Subject } from 'rxjs';
 export class LivestreamsContainerComponent implements OnInit {
   private readonly util = inject(LiveStreamsUtilFactoryService);
   private readonly zone = inject(NgZone);
-  channels = signal<Channel[]>([]);
-  originalChannels: Channel[] = [];
+  modifiedChannels = signal<Channel[] | null>(null);
+  originalChannels = signal<Channel[]>([]);
+  visibleChannels = computed(() => {
+    return this.modifiedChannels() || this.originalChannels();
+  });
   editingFields = new Map<string, string>(); // Temporary editing values
   modifiedFields = signal<Set<string>>(new Set());
   total = signal(0);
@@ -38,27 +41,26 @@ export class LivestreamsContainerComponent implements OnInit {
   errorIndex = signal<number | null>(null);
   private audioElement: HTMLAudioElement | null = null;
   private readonly playStream$ = new Subject<Channel | null>();
+  hasChanges() {
+    return !!this.modifiedChannels();
+  }
   
   // Add form related
   showAddForm = signal(false);
   newChannel: Partial<Channel> = {};
 
-  // constructor() {
-  //   this.playStream$.pipe(
-  //     exhaustMap(channel => {
-  //     })
-  //   ).subscribe();
-  // }
-
   favoriteChanged(index: number, event: Event) {
+    // Apply any pending edits
+    this.applyPendingEdits();
+
     const isChecked = (event.target as HTMLInputElement).checked;
-    const channels = this.channels();
+    const channels = this.visibleChannels();
     const channel = channels.find(c => c.index === index);
     if (!channel) return;
     const updatedChannels = channels.map(c => c.index === index ? { ...c, favorite: isChecked ? '1' : '0' } : c);
-    this.channels.set(updatedChannels);
+    this.modifiedChannels.set(updatedChannels);
 
-    this.onSave();
+    // this.onSave();
   }
 
   // Store temporary edit value without updating the signal
@@ -78,7 +80,7 @@ export class LivestreamsContainerComponent implements OnInit {
       const fieldKey = `${index}-${field}`;
       this.editingFields.delete(fieldKey);
       // Reset the input value to the original
-      const channel = this.channels().find(c => c.index === index);
+      const channel = this.visibleChannels().find(c => c.index === index);
       if (channel) {
         (event.target as HTMLInputElement).value = String(channel[field] || '');
       }
@@ -91,7 +93,7 @@ export class LivestreamsContainerComponent implements OnInit {
     if (this.editingFields.has(fieldKey)) {
       return this.editingFields.get(fieldKey) || '';
     }
-    const channel = this.channels().find(c => c.index === index);
+    const channel = this.visibleChannels().find(c => c.index === index);
     return channel ? String(channel[field] || '') : '';
   }
 
@@ -101,7 +103,7 @@ export class LivestreamsContainerComponent implements OnInit {
     const value = this.editingFields.get(fieldKey);
     if (value === undefined) return;
     
-    const channels = this.channels();
+    const channels = this.visibleChannels();
     const channel = channels.find(c => c.index === index);
     if (!channel) return;
     
@@ -115,10 +117,10 @@ export class LivestreamsContainerComponent implements OnInit {
     const updatedChannels = channels.map(c => 
       c.index === index ? { ...c, [field]: value } : c
     );
-    this.channels.set(updatedChannels);
+    this.modifiedChannels.set(updatedChannels);
     this.editingFields.delete(fieldKey); // Clear the editing value
 
-    this.onSave();
+    // this.onSave();
   }
 
     // Check if a field has pending changes
@@ -126,7 +128,7 @@ export class LivestreamsContainerComponent implements OnInit {
     const fieldKey = `${index}-${field}`;
     if (!this.editingFields.has(fieldKey)) return false;
     
-    const channel = this.channels().find(c => c.index === index);
+    const channel = this.visibleChannels().find(c => c.index === index);
     if (!channel) return false;
     
     return this.editingFields.get(fieldKey) !== String(channel[field] || '');
@@ -136,24 +138,11 @@ export class LivestreamsContainerComponent implements OnInit {
     return this.modifiedFields().has(`${index}-${field}`);
   }
 
-  hasChanges(): boolean {
-    return this.modifiedFields().size > 0 || this.editingFields.size > 0;
-  }
-
-  // Check if channels have been added or removed
-  hasStructuralChanges(): boolean {
-    const currentChannels = this.channels();
-    if (currentChannels.length !== this.originalChannels.length) {
-      return true;
-    }
-    // Check if any channel has a deletion marker
-    return Array.from(this.modifiedFields()).some(field => field.endsWith('-deleted'));
-  }
-
-    resetChanges() {
+  resetChanges() {
     if (confirm('Are you sure you want to discard all changes?')) {
-      this.channels.set([...this.originalChannels]);
-      this.modifiedFields.set(new Set());
+      // this.channels.set([...this.originalChannels()]);
+      this.modifiedChannels.set(null);
+      // this.modifiedFields.set(new Set());
       this.editingFields.clear();
     }
       
@@ -162,7 +151,7 @@ export class LivestreamsContainerComponent implements OnInit {
 
   // Get the next available index (max current index + 1)
   getNextIndex(): number {
-    const channels = this.channels();
+    const channels = this.visibleChannels();
     if (channels.length === 0) return 0;
     return Math.max(...channels.map(c => c.index)) + 1;
   }
@@ -194,11 +183,13 @@ export class LivestreamsContainerComponent implements OnInit {
   }
 
   getChannelByIndex(index: number): Channel | undefined {
-    return this.channels().find(c => c.index === index);
+    return this.visibleChannels().find(c => c.index === index);
   }
 
     // Remove a channel and update indices
   removeChannel(index: number) {
+    this.applyPendingEdits();
+
     if (!confirm(`Are you sure you want to remove the channel at index ${index}?`)) {
       this.util.refocusMainWindow();
 
@@ -209,7 +200,7 @@ export class LivestreamsContainerComponent implements OnInit {
       this.stopStream();
     }
 
-    const channels = this.channels();
+    const channels = this.visibleChannels();
     const updatedChannels = channels
       .filter(c => c.index !== index)
       .map(c => {
@@ -221,31 +212,31 @@ export class LivestreamsContainerComponent implements OnInit {
       });
     
     // Update channels
-    this.channels.set(updatedChannels);
+    this.modifiedChannels.set(updatedChannels);
     
-    // Mark all affected channels as modified
-    const modifiedSet = new Set(this.modifiedFields());
+    // // Mark all affected channels as modified
+    // const modifiedSet = new Set(this.modifiedFields());
     
-    // Mark the removed channel's index as deleted (we'll need this for tracking)
-    // Add a special marker for deletion
-    modifiedSet.add(`${index}-deleted`);
+    // // Mark the removed channel's index as deleted (we'll need this for tracking)
+    // // Add a special marker for deletion
+    // modifiedSet.add(`${index}-deleted`);
     
-    // Mark all shifted channels as modified
-    updatedChannels.forEach(c => {
-      const originalChannel = this.originalChannels.find(oc => 
-        // Find by original position - channels after the deleted one were at index+1
-        oc.index === (c.index >= index ? c.index + 1 : c.index)
-      );
+    // // Mark all shifted channels as modified
+    // updatedChannels.forEach(c => {
+    //   const originalChannel = this.originalChannels().find(oc => 
+    //     // Find by original position - channels after the deleted one were at index+1
+    //     oc.index === (c.index >= index ? c.index + 1 : c.index)
+    //   );
       
-      if (originalChannel && originalChannel.index > index) {
-        // This channel was shifted, mark all its fields as modified
-        ['url', 'name', 'genre', 'lang', 'bitrate', 'favorite'].forEach(field => {
-          modifiedSet.add(`${c.index}-${field}`);
-        });
-      }
-    });
+    //   if (originalChannel && originalChannel.index > index) {
+    //     // This channel was shifted, mark all its fields as modified
+    //     ['url', 'name', 'genre', 'lang', 'bitrate', 'favorite'].forEach(field => {
+    //       modifiedSet.add(`${c.index}-${field}`);
+    //     });
+    //   }
+    // });
     
-    this.modifiedFields.set(modifiedSet);
+    // this.modifiedFields.set(modifiedSet);
     
     // Clear any editing fields for the removed channel and shifted channels
     const keysToRemove: string[] = [];
@@ -261,11 +252,13 @@ export class LivestreamsContainerComponent implements OnInit {
     this.errorIndex.set(null);
 
     this.util.refocusMainWindow();
-    this.onSave();
+    // this.onSave();
   }
 
   // Add the new channel
   addChannel() {
+    this.applyPendingEdits();
+    
     // Validate required fields
     if (!this.newChannel.url || !this.newChannel.name) {
       this.showAlert('URL and Name are required fields');
@@ -286,7 +279,7 @@ export class LivestreamsContainerComponent implements OnInit {
       return;
     }
 
-    const channels = this.channels();
+    const channels = this.visibleChannels();
     const newChannelData: Channel = {
       index: newIndex,
       url: this.newChannel.url || '',
@@ -317,19 +310,19 @@ export class LivestreamsContainerComponent implements OnInit {
     updatedChannels.sort((a, b) => a.index - b.index);
     
     // Update channels and track as modified
-    this.channels.set(updatedChannels);
+    this.modifiedChannels.set(updatedChannels);
     
-    // Mark all shifted channels and the new channel as modified
-    const modifiedSet = new Set(this.modifiedFields());
-    updatedChannels.forEach(c => {
-      if (c.index >= newIndex) {
-        // Mark all fields of affected channels as modified
-        ['url', 'name', 'genre', 'lang', 'bitrate', 'favorite'].forEach(field => {
-          modifiedSet.add(`${c.index}-${field}`);
-        });
-      }
-    });
-    this.modifiedFields.set(modifiedSet);
+    // // Mark all shifted channels and the new channel as modified
+    // const modifiedSet = new Set(this.modifiedFields());
+    // updatedChannels.forEach(c => {
+    //   if (c.index >= newIndex) {
+    //     // Mark all fields of affected channels as modified
+    //     ['url', 'name', 'genre', 'lang', 'bitrate', 'favorite'].forEach(field => {
+    //       modifiedSet.add(`${c.index}-${field}`);
+    //     });
+    //   }
+    // });
+    // this.modifiedFields.set(modifiedSet);
 
     if (this.playingStreamUrl() === this.newChannel.url) {
       this.stopStream();
@@ -340,7 +333,7 @@ export class LivestreamsContainerComponent implements OnInit {
     this.showAddForm.set(false);
     this.newChannel = {};
 
-    this.onSave();
+    // this.onSave();
   }
 
   // Helper kept in case we want chips later
@@ -437,21 +430,18 @@ export class LivestreamsContainerComponent implements OnInit {
   }
 
   sortChannelsByField(field: keyof Channel) {
-    // Apply any pending edits first
-    if(!this.confirmPendingEdits()) {
-      return;
-    }
+    this.applyPendingEdits();
 
-    const channels = this.channels();
+    const channels = this.visibleChannels();
     const sorted = [...channels].sort((a, b) => {
       const valA = String(a[field] || '').toLowerCase();
       const valB = String(b[field] || '').toLowerCase();
       return valA.localeCompare(valB);
     });
     const remapNumbers = sorted.map((ch, idx) => ({ ...ch, index: idx }));
-    this.channels.set(remapNumbers);
+    this.modifiedChannels.set(remapNumbers);
 
-    this.onSave();
+    // this.onSave();
     // this.util.refocusMainWindow();
   }
 
@@ -527,14 +517,26 @@ export class LivestreamsContainerComponent implements OnInit {
       switchMap(({ path }) => this.util.importLiveStreamsFromPath(path, 'live_streams.sii')),
       filter((res) => !!res && !res.canceled),
       switchMap(() => this.util.findGameChannels('live_streams.sii')),
-            tap((res) => {
-        this.channels.set(res.channels ?? []);
-        this.originalChannels = JSON.parse(JSON.stringify(res.channels ?? []));
-        this.modifiedFields.set(new Set());
+      tap((res) => {
+        this.modifiedChannels.set(null);
+        this.originalChannels.set(JSON.parse(JSON.stringify(res.channels ?? [])));
+        // this.modifiedFields.set(new Set());
         this.editingFields.clear();
-        this.total.set(res.total ?? res.channels?.length ?? 0);
       })
     ).subscribe({ error: (e) => console.error('Import failed', e) });
+  }
+
+  onImportFromEuroTruckSimulator() {
+    this.util.importLiveStreamsFromEuroTruckSimulator('live_streams.sii').pipe(
+      filter((res) => !!res && !res.canceled),  
+      switchMap(() => this.util.findGameChannels('live_streams.sii')),
+      tap((res) => {
+        this.modifiedChannels.set(null);
+        this.originalChannels.set(JSON.parse(JSON.stringify(res.channels ?? [])));
+        // this.modifiedFields.set(new Set());
+        this.editingFields.clear();
+      })
+    ).subscribe({ error: (e) => console.error('Import from Euro Truck Simulator failed', e) });
   }
 
   confirmPendingEdits(): boolean {
@@ -542,16 +544,7 @@ export class LivestreamsContainerComponent implements OnInit {
       const confirmApply = confirm('You have some remaining pending edits. Apply them before saving?');
       if (confirmApply) {
         // Apply all pending changes
-        for (const [fieldKey, value] of this.editingFields.entries()) {
-          const [indexStr, field] = fieldKey.split('-');
-          const index = parseInt(indexStr);
-          const channels = this.channels();
-          const updatedChannels = channels.map(c => 
-            c.index === index ? { ...c, [field]: value } : c
-          );
-          this.channels.set(updatedChannels);
-        }
-        this.editingFields.clear();
+        this.applyPendingEdits();
 
         this.util.refocusMainWindow();
       } else {
@@ -563,23 +556,32 @@ export class LivestreamsContainerComponent implements OnInit {
     return true;
   }
 
+  applyPendingEdits() {
+    for (const [fieldKey, value] of this.editingFields.entries()) {
+          const [indexStr, field] = fieldKey.split('-');
+          const index = parseInt(indexStr);
+          const channels = this.visibleChannels();
+          const updatedChannels = channels.map(c => 
+            c.index === index ? { ...c, [field]: value } : c
+          );
+          this.modifiedChannels.set(updatedChannels);
+      }
+      
+      this.editingFields.clear();
+  }
+
   onSave() {
-    // Apply any pending edits first
-    if(!this.confirmPendingEdits()) {
-      return;
-    }
+    this.applyPendingEdits();
 
     // Save the current (possibly modified) channel data to the original file
-    const currentChannels = this.channels();
+    const currentChannels = this.visibleChannels();
     this.util.saveLiveStreamsData(currentChannels, 'live_streams.sii').subscribe({
       next: (res) => { 
         if (res?.success) {
           console.log('Changes saved successfully');
-          // this.showAlert('Changes saved successfully to live_streams.sii');
           // Update original channels and clear modifications tracking
-          this.originalChannels = JSON.parse(JSON.stringify(currentChannels));
-          this.modifiedFields.set(new Set());
-          this.editingFields.clear();
+          this.originalChannels.set(JSON.parse(JSON.stringify(currentChannels)));
+          this.modifiedChannels.set(null);
         } else {
           console.error('Save failed:', res?.error);
           this.showAlert(`Failed to save changes: ${res?.error || 'Unknown error'}`);
@@ -593,9 +595,42 @@ export class LivestreamsContainerComponent implements OnInit {
   }
 
   onExport() {
+    if(this.hasChanges()) {
+      const confirmExport = confirm('You have unsaved changes. Do you want to export the data without your pending changes?');
+
+      if (!confirmExport) {
+        return;
+      }
+    }
+
     // Export with the current (possibly modified) channel data
-    const currentChannels = this.channels();
+    const currentChannels = this.originalChannels();
     this.util.exportLiveStreamsWithData(currentChannels, 'live_streams.sii', 'live_streams.sii').subscribe({
+      next: (res) => { 
+        if (!res?.canceled) {
+          console.log('Exported to', res.destPath);
+          this.showAlert(`Successfully exported live_streams.sii with updated favorites to:\n${res.destPath}`);
+        }
+      },
+      error: (e) => {
+        console.error('Export failed', e);
+        this.showAlert('Export failed. Please check the console for details.');
+      }
+    });
+  }
+
+  onExportToEuroTruckSimulator() {
+    if(this.hasChanges()) {
+      const confirmExport = confirm('You have unsaved changes. Do you want to export the data without your pending changes to Euro Truck Simulator 2?');
+
+      if (!confirmExport) {
+        return;
+      }
+    }
+
+    // Export with the current (possibly modified) channel data
+    const currentChannels = this.originalChannels();
+    this.util.exportLiveStreamsWithDataToEuroTruckSimulator(currentChannels).subscribe({
       next: (res) => { 
         if (!res?.canceled) {
           console.log('Exported to', res.destPath);
@@ -613,9 +648,9 @@ export class LivestreamsContainerComponent implements OnInit {
     this.loading.set(true);
     this.util.findGameChannels('live_streams.sii').pipe(
             tap((res) => {
-        this.channels.set(res.channels ?? []);
-        this.originalChannels = JSON.parse(JSON.stringify(res.channels ?? []));
-        this.modifiedFields.set(new Set());
+        this.modifiedChannels.set(null);
+        this.originalChannels.set(JSON.parse(JSON.stringify(res.channels ?? [])));
+        // this.modifiedFields.set(new Set());
         this.editingFields.clear();
         this.total.set(res.total ?? res.channels?.length ?? 0);
       }),

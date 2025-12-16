@@ -114,6 +114,8 @@ contextBridge.exposeInMainWorld('api', {
         const appPath = await this.getAppPath();
         filePath = join(appPath, filePath);
       }
+
+      console.log(`Finding channels in: ${filePath}`);
       
       // Check if file exists
       try {
@@ -184,14 +186,21 @@ contextBridge.exposeInMainWorld('api', {
     }
   },
 
+  async exportLiveStreamsWithDataToEuroTruckSimulator(channels) {
+    const euroTruckSimulatorPath = await ipcRenderer.invoke('get-ets2-path');
+    console.log(`Exporting to Euro Truck Simulator path: ${join(euroTruckSimulatorPath, 'live_streams.sii')}`);
+
+    return this.exportLiveStreamsWithData(channels, 'live_streams.sii', join(euroTruckSimulatorPath, 'live_streams.sii'));
+  },
+
   /**
    * Export live_streams.sii with updated channel data (e.g., modified favorites)
    * @param {Array<{index:number, url:string, name:string, genre:string, lang:string, bitrate:string, favorite:string}>} channels
    * @param {string} [sourcePath='live_streams.sii']
-   * @param {string} [fileName='live_streams.sii']
+   * @param {string} [destinationPath='live_streams.sii']
    * @returns {Promise<{canceled:boolean, destPath?:string}>}
    */
-  async exportLiveStreamsWithData(channels, sourcePath = 'live_streams.sii', fileName = 'live_streams.sii') {
+  async exportLiveStreamsWithData(channels, sourcePath = 'live_streams.sii', destinationPath = 'live_streams.sii') {
     try {
       if (!isAbsolute(sourcePath)) {
         const appPath = await this.getAppPath();
@@ -203,7 +212,7 @@ contextBridge.exposeInMainWorld('api', {
       try {
         originalContent = await fs.readFile(sourcePath, 'utf8');
       } catch {
-        const debugInfo = await this.debugPaths(fileName);
+        const debugInfo = await this.debugPaths(destinationPath);
         const existingPath = debugInfo.attempts.find(a => a.exists);
         if (existingPath) {
           sourcePath = existingPath.path;
@@ -242,17 +251,34 @@ contextBridge.exposeInMainWorld('api', {
           updatedLines.push(line);
         }
       }
+
+      let destPath = '';
       
-      const destDir = await ipcRenderer.invoke('select-export-dir');
-      if (!destDir) return { canceled: true };
+      if(!isAbsolute(destinationPath)) {
+        const destDir = await ipcRenderer.invoke('select-export-dir');
+        if (!destDir) return { canceled: true };
       
-      const destPath = join(destDir, fileName);
+        destPath = join(destDir, destinationPath);
+        console.log(`Exporting to: ${destPath}`);
+      } else {
+        destPath = destinationPath;
+        console.log(`Exporting to: ${destPath}`);
+      }
+      
       await fs.writeFile(destPath, updatedLines.join('\n'), 'utf8');
+      
       return { canceled: false, destPath };
     } catch (error) {
       console.error('Export error:', error);
       return { canceled: true, error: error.message };
     }
+  },
+
+  async importLiveStreamsFromEuroTruckSimulator(targetPath = 'live_streams.sii') {
+    const euroTruckSimulatorPath = await ipcRenderer.invoke('get-ets2-path');
+    
+    if (!euroTruckSimulatorPath) return { canceled: true };
+    return this.importLiveStreamsFromPath(join(euroTruckSimulatorPath, 'live_streams.sii'), targetPath);
   },
 
   /**

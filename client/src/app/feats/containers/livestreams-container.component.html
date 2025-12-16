@@ -8,12 +8,12 @@
     <div class="mb-3 flex items-center justify-between">
           <div class="flex items-center gap-3">
             <div class="text-sm text-gray-600" *ngIf="loaded()">
-              Total channels: <span class="text-gray-900 font-medium">{{ total() }}</span>
+              Total channels: <span class="text-gray-900 font-medium">{{ visibleChannels().length }}</span>
             </div>
             <div *ngIf="hasChanges()" class="text-sm text-amber-600 font-medium">
               ⚠️ Unsaved changes
             </div>
-            <!-- <button type="button" (click)="onSave()"
+            <button type="button" (click)="onSave()"
                     [disabled]="!hasChanges()"
                     [class.bg-green-600]="hasChanges()"
                     [class.hover:bg-green-700]="hasChanges()"
@@ -21,7 +21,7 @@
                     [class.cursor-not-allowed]="!hasChanges()"
                     class="inline-flex items-center gap-2 rounded-md text-white text-sm px-3 py-1.5">
               Save Changes
-            </button> -->
+            </button>
             <button type="button" (click)="resetChanges()"
                     *ngIf="hasChanges()"
                     class="inline-flex items-center gap-2 rounded-md border border-red-300 bg-white text-red-600 text-sm px-3 py-1.5 hover:bg-red-50">
@@ -42,8 +42,12 @@
               Import live_streams.sii
             </button>
             <button type="button" (click)="onExport()"
+                    class="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white text-gray-900 text-sm px-3 py-1.5 hover:bg-gray-50">
+              Export live_streams.sii
+            </button>
+            <button type="button" (click)="onExportToEuroTruckSimulator()"
                     class="inline-flex items-center gap-2 rounded-md bg-gray-900 text-white text-sm px-3 py-1.5 hover:bg-black/80">
-              Export livestreams.sii
+              Save to Euro Truck Simulator 2
             </button>
           </div>
         </div>
@@ -154,8 +158,9 @@
 
         <div *ngIf="!loading()" class="flex-1 overflow-hidden rounded-md border border-gray-200 bg-white text-black flex flex-col">
           <div class="overflow-x-auto overflow-y-auto flex-1">
-            <table class="min-w-[900px] w-full text-sm table-auto border-collapse">
-                            <thead class="text-left bg-gray-50 sticky top-0 z-10">
+            
+            <table *ngIf="visibleChannels().length" class="min-w-[900px] w-full text-sm table-auto border-collapse">
+              <thead class="text-left bg-gray-50 sticky top-0 z-10">
                 <tr class="border-b border-gray-200">
                                 <th class="py-2 px-2 w-12">#</th>
                 <th class="py-2 px-2 min-w-[150px]">Name <a href="#" class="text-blue-500" (click)="sortChannelsByField('name')">(Sort)</a></th>
@@ -169,7 +174,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let ch of channels()" class="border-b border-gray-200">
+              <tr *ngFor="let ch of visibleChannels()" class="border-b border-gray-200">
                 <td class="py-2 px-2 text-gray-600 text-xs">{{ ch.index }}</td>
                 <td class="py-1 px-2">
                   <div class="flex items-center gap-1">
@@ -274,7 +279,7 @@
                                 <td class="py-1 px-1">
                   <button type="button" (click)="playStream(ch)"
                           [disabled]="loadingIndex() === ch.index"
-                          [class.bg-red-500]="playingStreamUrl() === channel.url"
+                          [class.bg-red-500]="playingStreamUrl() === ch.url"
                           [class.hover:bg-red-600]="playingStreamUrl() === ch.url"
                           [class.bg-orange-500]="errorIndex() === ch.index"
                           [class.hover:bg-orange-600]="errorIndex() === ch.index"
@@ -289,7 +294,7 @@
                     <svg *ngIf="errorIndex() === ch.index && loadingIndex() !== ch.index" class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span *ngIf="loadingIndex() !== ch.index && errorIndex() !== ch.index">{{ playingIndex() === ch.index ? 'Stop' : 'Play' }}</span>
+                    <span *ngIf="loadingIndex() !== ch.index && errorIndex() !== ch.index">{{ playingStreamUrl() === ch.url ? 'Stop' : 'Play' }}</span>
                     <span *ngIf="errorIndex() === ch.index && loadingIndex() !== ch.index">Retry</span>
                   </button>
                 </td>
@@ -304,7 +309,19 @@
                 </td>
               </tr>
                         </tbody>
-          </table>
+            </table>
+
+            <div *ngIf="!visibleChannels().length" class="flex flex-col items-center justify-center h-full py-10">
+                <p class="text-center text-gray-500 py-4">No channels found.</p>
+              <button type="button" (click)="onImport()"
+                    class="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white text-gray-900 text-sm px-3 py-1.5 hover:bg-gray-50">
+                Import live_streams.sii
+              </button>
+              <button type="button" (click)="onImportFromEuroTruckSimulator()"
+                    class="inline-flex items-center gap-2 rounded-md bg-gray-900 text-white text-sm px-3 py-1.5 hover:bg-black/80">
+                  Import from Euro Truck Simulator 2
+              </button>
+            </div>
           </div>
         </div>
       </div>
