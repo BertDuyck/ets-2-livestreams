@@ -35,11 +35,9 @@
       "electron/**",
       "client/dist/**",
       "utils/**",
-      "package.json",
-      "live_streams.sii"
+      "package.json"
     ],
     "asarUnpack": [
-      "live_streams.sii",
       "utils/**/*.js"
     ],
     "directories": {
