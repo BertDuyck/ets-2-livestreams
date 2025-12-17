@@ -319,7 +319,9 @@ contextBridge.exposeInMainWorld("api", {
   async importLiveStreamsFromEuroTruckSimulator(
     targetPath = "live_streams.sii"
   ) {
+    console.log('importLiveStreamsFromEuroTruckSimulator', targetPath);
     const euroTruckSimulatorPath = await ipcRenderer.invoke("get-ets2-path");
+    console.log('importLiveStreamsFromEuroTruckSimulator euroTruckSimulatorPath', targetPath, join(euroTruckSimulatorPath, "live_streams.sii"));
 
     return this.importLiveStreamsFromPath(
       join(euroTruckSimulatorPath, "live_streams.sii"),
@@ -363,22 +365,21 @@ contextBridge.exposeInMainWorld("api", {
 
   /** Copy from an explicit source path to target (default live_streams.sii) with backup rotation. */
   async importLiveStreamsFromPath(srcPath, targetPath = "live_streams.sii") {
+    console.log('importLiveStreamsFromPath', srcPath, targetPath);
+    const channels = findCurrentChannels(srcPath);
+    if (!~channels?.length) {
+      throw new Error('Invalid file');
+    }
     const appPath = await this.getAppPath();
     const appFilePath = join(appPath, 'live_streams.sii');
-    console.log('UPDATE FILE TO', appFilePath);
     const stat = await fs.stat(appFilePath).catch(() => null);
     console.log('FILE STAT', stat);
     if (!stat || !stat.isFile()) {
-      const channels = findCurrentChannels(srcPath);
-      if (!~channels?.length) {
-        throw new Error('Invalid file');
-      }
       // await fs.writeFile(targetPath, updatedLines.join("\n"), "utf8");
       await fs.copyFile(srcPath, appFilePath);
-
-      return channels;
     }
-    return findCurrentChannels(srcPath);
+
+    return channels;
     // try {
     //   const appPath = await this.getAppPath();
     //   const absDest = isAbsolute(targetPath)
@@ -481,7 +482,7 @@ contextBridge.exposeInMainWorld("api", {
         files.sort((a, b) => b.name.localeCompare(a.name));
         const toDelete = files.slice(10);
         await Promise.allSettled(toDelete.map((f) => fs.unlink(f.path)));
-      } catch {}
+      } catch { }
 
       // Parse the content to preserve non-stream_data lines and structure
       const lines = originalContent.split(/\r?\n/);

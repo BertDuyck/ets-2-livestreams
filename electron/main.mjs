@@ -57,7 +57,7 @@ app.whenReady().then(() => {
   ipcMain.handle('get-ets2-path', () => {
       const documentsPath = app.getPath('documents');
       const path = join(documentsPath, 'Euro Truck Simulator 2')
-      fstat(path);
+      // fstat(path);
       return path;
   });
 
