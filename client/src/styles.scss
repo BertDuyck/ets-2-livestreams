@@ -4,3 +4,10 @@
 
 /* You can add global styles to this file, and also import other style files */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+:root {
+  --ets-bg: lab(35.24% -0.18 -0.73);
+  --ets-panel: #15171c;
+  --ets-accent: #d4a217; /* subtle gold accent */
+  --ets-accent-2: #9c1a1c; /* deep red accent */
+}

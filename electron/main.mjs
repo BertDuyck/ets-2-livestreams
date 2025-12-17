@@ -9,12 +9,13 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1300,
     height: 800,
+    autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
-      devTools: true,
+      devTools: true
     },
   });
 

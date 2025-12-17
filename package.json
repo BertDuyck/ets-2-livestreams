@@ -15,7 +15,7 @@
     "dev": "concurrently -k \"npm:dev:ng\" \"npm:dev:electron\"",
     "clean": "rimraf dist || echo \"Warning: Could not clean build folders\"",
     "build:renderer": "cd client && ng build",
-    "build:electron": "(npm run clean || true) && npm run build:renderer && electron-builder",
+    "build:electron": "(npm run clean || true) && npm run build:renderer && electron-builder --win --x64 --ia32",
     "build": "npm run build:electron"
   },
   "devDependencies": {
@@ -29,23 +29,23 @@
   },
   "main": "electron/main.mjs",
     "build": {
-    "appId": "com.dukes-ets-editor.app",
-    "productName": "Dukes ETS Editor",
-    "files": [
+      "appId": "com.dukes-ets-editor.app",
+      "productName": "Dukes ETS Editor",
+      "files": [
       "electron/**",
       "client/dist/**",
       "utils/**",
       "package.json"
-    ],
-    "asarUnpack": [
+      ],
+      "asarUnpack": [
       "utils/**/*.js"
-    ],
-    "directories": {
+      ],
+      "directories": {
       "buildResources": "assets"
-    },
-    "win": {
+      },
+      "win": {
       "target": [
-        "dir"
+        "dir", "nsis"
       ],
       "certificateFile": null,
       "certificatePassword": null,

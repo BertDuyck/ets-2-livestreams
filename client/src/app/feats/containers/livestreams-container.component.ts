@@ -15,11 +15,12 @@ type Channel = {
 
 import { LiveStreamsUtilFactoryService } from '../../live-streams-util-factory.service';
 import { defer, EMPTY, from, Subject } from 'rxjs';
+import { FavoriteCheckComponent } from '../../components/favorite-check.component';
 
 @Component({
   selector: 'app-livestreams-container',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, FavoriteCheckComponent],
   templateUrl: './livestreams-container.component.html',
 })
 export class LivestreamsContainerComponent implements OnInit {
@@ -71,8 +72,6 @@ export class LivestreamsContainerComponent implements OnInit {
     if (!channel) return;
 
     this.toggleFavorite(channel, isChecked);
-
-    // this.onSave();
   }
 
   toggleFavorite(channel: Channel | undefined | null, checked: boolean) {
@@ -138,8 +137,6 @@ export class LivestreamsContainerComponent implements OnInit {
     );
     this.modifiedChannels.set(updatedChannels);
     this.editingFields.delete(fieldKey); // Clear the editing value
-
-    // this.onSave();
   }
 
     // Check if a field has pending changes
@@ -183,8 +180,8 @@ export class LivestreamsContainerComponent implements OnInit {
       name: '',
       genre: '',
       lang: 'EN',
-      bitrate: '',
-      favorite: '0'
+      bitrate: '128',
+      favorite: '1'
     };
     this.showAddForm.set(true);
   }
@@ -196,8 +193,7 @@ export class LivestreamsContainerComponent implements OnInit {
   }
 
     // Handle favorite checkbox change in add form
-  onNewChannelFavoriteChange(event: Event) {
-    const isChecked = (event.target as HTMLInputElement).checked;
+  onNewChannelFavoriteChange(isChecked: boolean) {
     this.newChannel.favorite = isChecked ? '1' : '0';
   }
 
@@ -241,7 +237,6 @@ export class LivestreamsContainerComponent implements OnInit {
     this.errorIndex.set(null);
 
     this.util.refocusMainWindow();
-    // this.onSave();
   }
 
   // Add the new channel
@@ -309,8 +304,6 @@ export class LivestreamsContainerComponent implements OnInit {
     // Reset the form
     this.showAddForm.set(false);
     this.newChannel = {};
-
-    // this.onSave();
   }
 
   // Helper kept in case we want chips later
@@ -457,9 +450,6 @@ export class LivestreamsContainerComponent implements OnInit {
     });
     const remapNumbers = sorted.map((ch, idx) => ({ ...ch, index: idx }));
     this.modifiedChannels.set(remapNumbers);
-
-    // this.onSave();
-    // this.util.refocusMainWindow();
   }
 
   // --- Validation helpers (pure, focused) ---
@@ -535,9 +525,8 @@ export class LivestreamsContainerComponent implements OnInit {
       filter((res) => !!res && !res.canceled),
       switchMap(() => this.util.findGameChannels('live_streams.sii')),
       tap((res) => {
-        this.modifiedChannels.set(null);
-        this.originalChannels.set(JSON.parse(JSON.stringify(res.channels ?? [])));
-        // this.modifiedFields.set(new Set());
+        this.modifiedChannels.set(JSON.parse(JSON.stringify(res.channels ?? [])));
+        // this.originalChannels.set(JSON.parse(JSON.stringify(res.channels ?? [])));
         this.editingFields.clear();
       })
     ).subscribe({ error: (e) => console.error('Import failed', e) });
@@ -573,23 +562,27 @@ export class LivestreamsContainerComponent implements OnInit {
   onSave() {
     this.applyPendingEdits();
 
-    // Save the current (possibly modified) channel data to the original file
+    if(!confirm('This will replace your existing Euro Truck Simulator 2 radio channels. \nAre you sure you want to continue? (Make sure your game is not running)')) {
+      this.util.refocusMainWindow();
+
+      return;
+    }
+
+    this.util.refocusMainWindow();
+
+    // Export with the current (possibly modified) channel data
     const currentChannels = this.visibleChannels();
-    this.util.saveLiveStreamsData(currentChannels, 'live_streams.sii').subscribe({
+    this.util.exportLiveStreamsWithDataToEuroTruckSimulator(currentChannels).subscribe({
       next: (res) => { 
-        if (res?.success) {
-          console.log('Changes saved successfully');
-          // Update original channels and clear modifications tracking
-          this.originalChannels.set(JSON.parse(JSON.stringify(currentChannels)));
+        if (!res?.canceled) {
+          this.originalChannels.set(currentChannels);
           this.modifiedChannels.set(null);
-        } else {
-          console.error('Save failed:', res?.error);
-          this.showAlert(`Failed to save changes: ${res?.error || 'Unknown error'}`);
+          console.log('Exported to', res.destPath);
         }
       },
       error: (e) => {
-        console.error('Save failed', e);
-        this.showAlert('Save failed. Please check the console for details.');
+        console.error('Export failed', e);
+        this.showAlert(`Export failed: ${e?.message || 'no e.message'}`);
       }
     });
   }
@@ -621,55 +614,20 @@ export class LivestreamsContainerComponent implements OnInit {
     });
   }
 
-  onExportToEuroTruckSimulator() {
-    if(this.hasChanges()) {
-      const confirmExport = confirm('You have unsaved changes. Do you want to export the data without your pending changes to Euro Truck Simulator 2?');
-
-      if (!confirmExport) {
-        return;
-      }
-
-      this.util.refocusMainWindow();
-    }
-
-    if(!confirm('This will replace your existing Euro Truck Simulator 2 radio channels. \n Are you sure you want to continue?')) {
-      this.util.refocusMainWindow();
-
-      return;
-    }
-
-    this.util.refocusMainWindow();
-
-    // Export with the current (possibly modified) channel data
-    const currentChannels = this.originalChannels();
-    this.util.exportLiveStreamsWithDataToEuroTruckSimulator(currentChannels).subscribe({
-      next: (res) => { 
-        if (!res?.canceled) {
-          console.log('Exported to', res.destPath);
-          this.showAlert(`Successfully exported live_streams.sii with updated favorites to:\n${res.destPath}`);
-        }
-      },
-      error: (e) => {
-        console.error('Export failed', e);
-        this.showAlert('Export failed. Please check the console for details.');
-      }
-    });
-  }
-
   ngOnInit() {
     this.loading.set(true);
-    this.util.findGameChannels('live_streams.sii').pipe(
-            tap((res) => {
+    this.util.importLiveStreamsFromEuroTruckSimulator('live_streams.sii').pipe(
+      filter((res) => !!res && !res.canceled),  
+      switchMap(() => this.util.findGameChannels('live_streams.sii')),
+      tap((res) => {
         this.modifiedChannels.set(null);
         this.originalChannels.set(JSON.parse(JSON.stringify(res.channels ?? [])));
         // this.modifiedFields.set(new Set());
         this.editingFields.clear();
-        this.total.set(res.total ?? res.channels?.length ?? 0);
-      }),
-      finalize(() => {
+      })
+    ).subscribe({ error: (e) => console.error('Import from Euro Truck Simulator failed', e), next: () => {
         this.loading.set(false);
         this.loaded.set(true);
-      })
-    ).subscribe();
+    } });
   }
 }
