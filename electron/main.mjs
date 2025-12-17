@@ -1,6 +1,7 @@
 import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { fstat } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const isDev = !app.isPackaged;
@@ -9,7 +10,7 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1300,
     height: 800,
-    autoHideMenuBar: true,
+    autoHideMenuBar: process.env.isDev,
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -55,7 +56,9 @@ app.whenReady().then(() => {
   // IPC: get ets2 path
   ipcMain.handle('get-ets2-path', () => {
       const documentsPath = app.getPath('documents');
-      return join(documentsPath, 'Euro Truck Simulator 2');
+      const path = join(documentsPath, 'Euro Truck Simulator 2')
+      fstat(path);
+      return path;
   });
 
   // IPC: choose import file (live_streams.sii)

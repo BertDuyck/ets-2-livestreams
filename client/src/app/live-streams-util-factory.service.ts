@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
-import { Observable, from, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { Observable, defer, from, of } from 'rxjs';
+import { catchError, map, switchMap, tap } from 'rxjs/operators';
 
 /** Search options compatible with findCurrentChannels in the Node util. */
 export interface SearchOptions {
@@ -38,9 +38,10 @@ export class LiveStreamsUtilFactoryService {
   /**
    * Find current channels parsed from live_streams.sii
    */
-  findGameChannels(filePath = 'live_streams.sii', search?: string | SearchOptions): Observable<ChannelResult> {
-    return from((window as any).api.findGameChannels(filePath, search) as Promise<ChannelResult>).pipe(
-      catchError(() => of<ChannelResult>({ total: 0, filteredCount: 0, channels: [] }))
+  findGameChannels(filePath = 'live_streams.sii', search?: string | SearchOptions): Observable<Channel[]> {
+    return defer(() => (window as any).api.findGameChannels(filePath, search) as Promise<ChannelResult>).pipe(
+      map(res => JSON.parse(JSON.stringify(res?.channels ?? []))),
+      // catchError(() => of<ChannelResult>({ total: 0, filteredCount: 0, channels: [] }))
     );
   }
 
@@ -70,7 +71,7 @@ export class LiveStreamsUtilFactoryService {
     fileName = 'live_streams.sii'
   ): Observable<{ canceled: boolean; destPath?: string }> {
     return from((window as any).api?.exportLiveStreamsWithData?.(channels, sourcePath, fileName) as Promise<{ canceled: boolean; destPath?: string }>).pipe(
-      catchError(() => of({ canceled: true as const }))
+      // catchError(() => of({ canceled: true as const }))
     );
   }
 
@@ -84,7 +85,21 @@ export class LiveStreamsUtilFactoryService {
       favorite: string;
     }>): Observable<{ canceled: boolean; destPath?: string }> {
     return from((window as any).api?.exportLiveStreamsWithDataToEuroTruckSimulator?.(channels) as Promise<{ canceled: boolean; destPath?: string }>).pipe(
-      catchError(() => of({ canceled: true as const }))
+      // catchError(() => of({ canceled: true as const }))
+    );
+  }
+
+  exportLiveStreamsWithDataToAppData(channels: Array<{
+      index: number;
+      url: string;
+      name: string;
+      genre: string;
+      lang: string;
+      bitrate: string;
+      favorite: string;
+    }>): Observable<{ canceled: boolean; destPath?: string }> {
+    return from((window as any).api?.exportLiveStreamsWithDataToAppData?.(channels) as Promise<{ canceled: boolean; destPath?: string }>).pipe(
+      // catchError(() => of({ canceled: true as const }))
     );
   }
 
@@ -106,16 +121,20 @@ export class LiveStreamsUtilFactoryService {
     );
   }
 
-  importLiveStreamsFromEuroTruckSimulator(targetPath = 'live_streams.sii'): Observable<{ canceled: boolean; srcPath?: string; destPath?: string }>{
-    return from((window as any).api?.importLiveStreamsFromEuroTruckSimulator?.(targetPath) as Promise<{ canceled: boolean; srcPath?: string; destPath?: string }>).pipe(
-      catchError(() => of({ canceled: true as const }))
+  importLiveStreamsFromEuroTruckSimulator(targetPath = 'live_streams.sii'): Observable<Channel[]>{
+    return defer(() => (window as any).api?.importLiveStreamsFromEuroTruckSimulator?.(targetPath) as Promise<ChannelResult>).pipe(
+      map(res => res?.channels),
+      // switchMap(() => this.findGameChannels('live_streams.sii')),
+      // catchError(() => of({ canceled: true as const }))
     );
   }
 
     /** Replace the target live_streams.sii with a chosen source path. */
-  importLiveStreamsFromPath(srcPath: string, targetPath = 'live_streams.sii'): Observable<{ canceled: boolean; srcPath?: string; destPath?: string }>{
-    return from((window as any).api?.importLiveStreamsFromPath?.(srcPath, targetPath) as Promise<{ canceled: boolean; srcPath?: string; destPath?: string }>).pipe(
-      catchError(() => of({ canceled: true as const }))
+  importLiveStreamsFromPath(srcPath: string, targetPath = 'live_streams.sii'): Observable<Channel[]>{
+    return from((window as any).api?.importLiveStreamsFromPath?.(srcPath, targetPath) as Promise<ChannelResult>).pipe(
+      map(res => res?.channels),
+      // catchError(() => of({ canceled: true as const }))
+      // switchMap(() => this.findGameChannels('live_streams.sii')),
     );
   }
 

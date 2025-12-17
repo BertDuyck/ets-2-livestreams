@@ -1,21 +1,11 @@
-import { Component, OnInit, signal, inject, NgZone, computed, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
-import { catchError, exhaustMap, filter, finalize, map, switchMap, tap } from 'rxjs/operators';
+import { Component, OnInit, signal, inject, NgZone, computed } from '@angular/core';
+import { catchError, filter, map, switchMap, tap } from 'rxjs/operators';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-type Channel = {
-  index: number;
-  url: string;
-  name: string;
-  genre: string;
-  lang: string;
-  bitrate: string;
-  favorite: string; // '0' | '1'
-};
-
 import { LiveStreamsUtilFactoryService } from '../../live-streams-util-factory.service';
 import { defer, EMPTY, from, Subject } from 'rxjs';
-import { FavoriteCheckComponent } from '../../components/favorite-check.component';
+import { FavoriteCheckComponent } from '../../components/favorite-check/favorite-check.component';
 
 @Component({
   selector: 'app-livestreams-container',
@@ -44,21 +34,21 @@ export class LivestreamsContainerComponent implements OnInit {
   protected audioElement: HTMLAudioElement | null = null;
   playingStreamName = computed(() => {
     const url = this.playingStreamUrl();
-    const channel = this.visibleChannels().find(c => c.url === url);
+    const channel = this.visibleChannels().find((c) => c.url === url);
     return channel ? channel.name : '';
   });
   playingChannel = computed(() => {
     const url = this.playingStreamUrl();
-    const channel = this.visibleChannels().find(c => c.url === url);
+    const channel = this.visibleChannels().find((c) => c.url === url);
     return channel;
   });
-  hasChanges = computed(() =>{
+  hasChanges = computed(() => {
     return !!this.modifiedChannels();
   });
   quedChannel = computed(() => {
-    return this.visibleChannels().find(c => c.index === this.loadingIndex());
+    return this.visibleChannels().find((c) => c.index === this.loadingIndex());
   });
-  
+
   // Add form related
   showAddForm = signal(false);
   newChannel: Partial<Channel> = {};
@@ -69,7 +59,7 @@ export class LivestreamsContainerComponent implements OnInit {
 
     const isChecked = (event.target as HTMLInputElement).checked;
     const channels = this.visibleChannels();
-    const channel = channels.find(c => c.index === index);
+    const channel = channels.find((c) => c.index === index);
     if (!channel) return;
 
     this.toggleFavorite(channel, isChecked);
@@ -78,7 +68,9 @@ export class LivestreamsContainerComponent implements OnInit {
   toggleFavorite(channel: Channel | undefined | null, checked: boolean) {
     if (!channel) return;
     const channels = this.visibleChannels();
-    const updatedChannels = channels.map(c => c.url === channel.url ? { ...c, favorite: checked ? '1' : '0' } : c);
+    const updatedChannels = channels.map((c) =>
+      c.url === channel.url ? { ...c, favorite: checked ? '1' : '0' } : c
+    );
     this.modifiedChannels.set(updatedChannels);
   }
 
@@ -89,7 +81,7 @@ export class LivestreamsContainerComponent implements OnInit {
     this.editingFields.set(fieldKey, value);
   }
 
-    // Handle keyboard events on input fields
+  // Handle keyboard events on input fields
   onFieldKeydown(index: number, field: keyof Channel, event: KeyboardEvent) {
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -99,20 +91,20 @@ export class LivestreamsContainerComponent implements OnInit {
       const fieldKey = `${index}-${field}`;
       this.editingFields.delete(fieldKey);
       // Reset the input value to the original
-      const channel = this.visibleChannels().find(c => c.index === index);
+      const channel = this.visibleChannels().find((c) => c.index === index);
       if (channel) {
         (event.target as HTMLInputElement).value = String(channel[field] || '');
       }
     }
   }
 
-    // Get the current editing value or the actual value
+  // Get the current editing value or the actual value
   getFieldValue(index: number, field: keyof Channel): string {
     const fieldKey = `${index}-${field}`;
     if (this.editingFields.has(fieldKey)) {
       return this.editingFields.get(fieldKey) || '';
     }
-    const channel = this.visibleChannels().find(c => c.index === index);
+    const channel = this.visibleChannels().find((c) => c.index === index);
     return channel ? String(channel[field] || '') : '';
   }
 
@@ -121,33 +113,31 @@ export class LivestreamsContainerComponent implements OnInit {
     const fieldKey = `${index}-${field}`;
     const value = this.editingFields.get(fieldKey);
     if (value === undefined) return;
-    
+
     const channels = this.visibleChannels();
-    const channel = channels.find(c => c.index === index);
+    const channel = channels.find((c) => c.index === index);
     if (!channel) return;
-    
+
     // Validate based on field type
     if (field === 'bitrate' && value !== '' && !/^[0-9]+$/.test(value)) {
       this.showAlert('Invalid bitrate. Please enter only numbers.');
       this.editingFields.delete(fieldKey);
       return;
     }
-    
-    const updatedChannels = channels.map(c => 
-      c.index === index ? { ...c, [field]: value } : c
-    );
+
+    const updatedChannels = channels.map((c) => (c.index === index ? { ...c, [field]: value } : c));
     this.modifiedChannels.set(updatedChannels);
     this.editingFields.delete(fieldKey); // Clear the editing value
   }
 
-    // Check if a field has pending changes
+  // Check if a field has pending changes
   hasFieldPendingChanges(index: number, field: keyof Channel): boolean {
     const fieldKey = `${index}-${field}`;
     if (!this.editingFields.has(fieldKey)) return false;
-    
-    const channel = this.visibleChannels().find(c => c.index === index);
+
+    const channel = this.visibleChannels().find((c) => c.index === index);
     if (!channel) return false;
-    
+
     return this.editingFields.get(fieldKey) !== String(channel[field] || '');
   }
 
@@ -156,21 +146,17 @@ export class LivestreamsContainerComponent implements OnInit {
   }
 
   resetChanges() {
-    if (confirm('Are you sure you want to discard all changes?')) {
-      // this.channels.set([...this.originalChannels()]);
+    if (this.getConfirm('Are you sure you want to discard all changes?')) {
       this.modifiedChannels.set(null);
-      // this.modifiedFields.set(new Set());
       this.editingFields.clear();
     }
-      
-    this.util.refocusMainWindow();
   }
 
   // Get the next available index (max current index + 1)
   getNextIndex(): number {
     const channels = this.visibleChannels();
     if (channels.length === 0) return 0;
-    return Math.max(...channels.map(c => c.index)) + 1;
+    return Math.max(...channels.map((c) => c.index)) + 1;
   }
 
   // Initialize the new channel form
@@ -182,7 +168,7 @@ export class LivestreamsContainerComponent implements OnInit {
       genre: '',
       lang: 'EN',
       bitrate: '128',
-      favorite: '1'
+      favorite: '1',
     };
     this.showAddForm.set(true);
   }
@@ -193,16 +179,16 @@ export class LivestreamsContainerComponent implements OnInit {
     this.newChannel = {};
   }
 
-    // Handle favorite checkbox change in add form
+  // Handle favorite checkbox change in add form
   onNewChannelFavoriteChange(isChecked: boolean) {
     this.newChannel.favorite = isChecked ? '1' : '0';
   }
 
   getChannelByIndex(index: number): Channel | undefined {
-    return this.visibleChannels().find(c => c.index === index);
+    return this.visibleChannels().find((c) => c.index === index);
   }
 
-    // Remove a channel and update indices
+  // Remove a channel and update indices
   removeChannel(index: number) {
     this.applyPendingEdits();
 
@@ -212,18 +198,18 @@ export class LivestreamsContainerComponent implements OnInit {
 
     const channels = this.visibleChannels();
     const updatedChannels = channels
-      .filter(c => c.index !== index)
-      .map(c => {
+      .filter((c) => c.index !== index)
+      .map((c) => {
         // Decrement index for all channels after the removed one
         if (c.index > index) {
           return { ...c, index: c.index - 1 };
         }
         return c;
       });
-    
+
     // Update channels
     this.modifiedChannels.set(updatedChannels);
-    
+
     // Clear any editing fields for the removed channel and shifted channels
     const keysToRemove: string[] = [];
     this.editingFields.forEach((_, key) => {
@@ -233,17 +219,15 @@ export class LivestreamsContainerComponent implements OnInit {
         keysToRemove.push(key);
       }
     });
-    keysToRemove.forEach(key => this.editingFields.delete(key));
+    keysToRemove.forEach((key) => this.editingFields.delete(key));
 
     this.errorIndex.set(null);
-
-    this.util.refocusMainWindow();
   }
 
   // Add the new channel
   addChannel() {
     this.applyPendingEdits();
-    
+
     // Validate required fields
     if (!this.newChannel.url || !this.newChannel.name) {
       this.showAlert('URL and Name are required fields');
@@ -272,16 +256,16 @@ export class LivestreamsContainerComponent implements OnInit {
       genre: this.newChannel.genre || '',
       lang: this.newChannel.lang || 'EN',
       bitrate: this.newChannel.bitrate || '',
-      favorite: this.newChannel.favorite || '0'
+      favorite: this.newChannel.favorite || '0',
     };
 
     // If inserting at an existing index, shift all subsequent entries up
     const updatedChannels = [...channels];
-    const existingAtIndex = updatedChannels.find(c => c.index === newIndex);
-    
+    const existingAtIndex = updatedChannels.find((c) => c.index === newIndex);
+
     if (existingAtIndex) {
       // Shift all channels at or after this index up by 1
-      updatedChannels.forEach(c => {
+      updatedChannels.forEach((c) => {
         if (c.index >= newIndex) {
           c.index++;
         }
@@ -290,10 +274,10 @@ export class LivestreamsContainerComponent implements OnInit {
 
     // Add the new channel
     updatedChannels.push(newChannelData);
-    
+
     // Sort by index
     updatedChannels.sort((a, b) => a.index - b.index);
-    
+
     // Update channels and track as modified
     this.modifiedChannels.set(updatedChannels);
 
@@ -311,17 +295,20 @@ export class LivestreamsContainerComponent implements OnInit {
   getGenreTags(genre: string | undefined | null): string[] {
     return String(genre ?? '')
       .split(',')
-      .map(s => s.trim())
+      .map((s) => s.trim())
       .filter(Boolean);
   }
 
   playNextChannel(channel?: Channel) {
-    const playingChannel = channel || this.quedChannel() || this.visibleChannels().find(c => c.index === this.errorIndex());
-    if(!playingChannel) {
+    const playingChannel =
+      channel ||
+      this.quedChannel() ||
+      this.visibleChannels().find((c) => c.index === this.errorIndex());
+    if (!playingChannel) {
       return;
     }
     const channels = this.visibleChannels();
-    const currentIndex = channels.findIndex(c => c.url === playingChannel.url);
+    const currentIndex = channels.findIndex((c) => c.url === playingChannel.url);
     if (currentIndex === -1) return;
 
     const nextIndex = (currentIndex + 1) % channels.length;
@@ -329,14 +316,17 @@ export class LivestreamsContainerComponent implements OnInit {
   }
 
   playPreviousChannel(channel?: Channel) {
-    const playingChannel = channel || this.quedChannel() || this.visibleChannels().find(c => c.index === this.errorIndex());
-    console.log(playingChannel)
-    if(!playingChannel) {
+    const playingChannel =
+      channel ||
+      this.quedChannel() ||
+      this.visibleChannels().find((c) => c.index === this.errorIndex());
+    console.log(playingChannel);
+    if (!playingChannel) {
       return;
     }
     const channels = this.visibleChannels();
-    const currentIndex = channels.findIndex(c => c.url === playingChannel.url);
-    if (currentIndex === -1) return; 
+    const currentIndex = channels.findIndex((c) => c.url === playingChannel.url);
+    if (currentIndex === -1) return;
     const previousIndex = (currentIndex - 1 + channels.length) % channels.length;
     this.playStream(channels[previousIndex]);
   }
@@ -358,24 +348,26 @@ export class LivestreamsContainerComponent implements OnInit {
     this.errorIndex.set(null);
 
     if (!this.audioElement) {
-      this.audioElement = new Audio(url); 
+      this.audioElement = new Audio(url);
     }
     this.audioElement?.setAttribute('src', url);
     if (this.audioElement) {
-      defer(() => this.audioElement ? this.audioElement.play().catch() : Promise.resolve()).pipe(
-        catchError(err => {
-          if (this.audioElement?.src === url) {
-            this.loadingIndex.set(null);
-            this.errorIndex.set(-1);
-            console.error('Failed to play test stream:', err);
+      defer(() => (this.audioElement ? this.audioElement.play().catch() : Promise.resolve()))
+        .pipe(
+          catchError((err) => {
+            if (this.audioElement?.src === url) {
+              this.loadingIndex.set(null);
+              this.errorIndex.set(-1);
+              console.error('Failed to play test stream:', err);
+              return EMPTY;
+            }
             return EMPTY;
-          }
-          return EMPTY;
-        })
-      ).subscribe(() => {
-        this.loadingIndex.set(null);
-        this.playingStreamUrl.set(url);
-      });
+          })
+        )
+        .subscribe(() => {
+          this.loadingIndex.set(null);
+          this.playingStreamUrl.set(url);
+        });
     }
   }
 
@@ -385,7 +377,7 @@ export class LivestreamsContainerComponent implements OnInit {
     }
 
     this.errorIndex.set(null);
-    
+
     if (this.playingStreamUrl() === channel.url || this.loadingIndex() === channel.index) {
       this.stopStream();
       this.loadingIndex.set(null);
@@ -398,22 +390,24 @@ export class LivestreamsContainerComponent implements OnInit {
     this.audioElement?.setAttribute('src', channel.url);
 
     if (this.audioElement) {
-      defer(() => this.audioElement ? this.audioElement.play().catch() : Promise.resolve()).pipe(
-        catchError(err => {
-          if (this.loadingIndex() === channel.index) {
-            this.loadingIndex.set(null);
-            this.errorIndex.set(channel.index);
-            console.error('Failed to play stream:', err);
+      defer(() => (this.audioElement ? this.audioElement.play().catch() : Promise.resolve()))
+        .pipe(
+          catchError((err) => {
+            if (this.loadingIndex() === channel.index) {
+              this.loadingIndex.set(null);
+              this.errorIndex.set(channel.index);
+              console.error('Failed to play stream:', err);
 
+              return EMPTY;
+            }
+            // this.showAlert(`Unable to play stream: ${channel.name}`);
             return EMPTY;
-          }
-          // this.showAlert(`Unable to play stream: ${channel.name}`);
-          return EMPTY;
-        })
-      ).subscribe(() => {
-        this.loadingIndex.set(null);
-        this.playingStreamUrl.set(channel.url);
-      });
+          })
+        )
+        .subscribe(() => {
+          this.loadingIndex.set(null);
+          this.playingStreamUrl.set(channel.url);
+        });
     }
   }
 
@@ -432,7 +426,7 @@ export class LivestreamsContainerComponent implements OnInit {
     this.zone.run(() => {
       alert(message);
       this.util.refocusMainWindow();
-    }); 
+    });
   }
 
   sortChannelsByField(field: keyof Channel, dest: 'asc' | 'desc' = 'asc') {
@@ -441,9 +435,9 @@ export class LivestreamsContainerComponent implements OnInit {
     const channels = this.visibleChannels();
     const sorted = [...channels].sort((a, b) => {
       if (dest === 'desc') {
-      const valA = String(b[field] || '').toLowerCase();
-      const valB = String(a[field] || '').toLowerCase();
-      return valA.localeCompare(valB);
+        const valA = String(b[field] || '').toLowerCase();
+        const valB = String(a[field] || '').toLowerCase();
+        return valA.localeCompare(valB);
       }
       const valA = String(a[field] || '').toLowerCase();
       const valB = String(b[field] || '').toLowerCase();
@@ -471,164 +465,198 @@ export class LivestreamsContainerComponent implements OnInit {
     return value === '' || /^[0-9]+$/.test(value);
   }
 
-  private parseEntries(text: string): Array<{ line: number; index: number; payload: string; }>{
+  private parseEntries(text: string): Array<{ line: number; index: number; payload: string }> {
     const lines = text.split(/\r?\n/);
     const entryRe = /^\s*stream_data\[(\d+)\]:\s*"([^"]*)"/;
-    const entries: Array<{ line:number; index:number; payload:string; }> = [];
+    const entries: Array<{ line: number; index: number; payload: string }> = [];
     for (let i = 0; i < lines.length; i++) {
       const m = lines[i].match(entryRe);
       if (m) entries.push({ line: i + 1, index: Number(m[1]), payload: m[2] });
     }
-    return entries.sort((a,b) => a.index - b.index);
+    return entries.sort((a, b) => a.index - b.index);
   }
 
   private validateEntry(payload: string) {
     const issues: string[] = [];
     if (!this.hasCorrectPipeCount(payload)) issues.push('PIPE_COUNT: expected 5 pipes (6 fields)');
-    if (!this.hasNoWhitespaceAroundPipes(payload)) issues.push('PIPE_WHITESPACE: whitespace around pipe');
+    if (!this.hasNoWhitespaceAroundPipes(payload))
+      issues.push('PIPE_WHITESPACE: whitespace around pipe');
     const parts = payload.split('|');
     if (parts.length >= 6) {
       const [url, name, , , bitrate, favorite] = parts;
       if (!url) issues.push('URL_EMPTY');
       if (!name) issues.push('NAME_EMPTY');
       if (!this.isValidBitrate(bitrate)) issues.push('BITRATE_INVALID');
-      if (!this.isValidFavorite(favorite)) issues.push("FAVORITE_INVALID");
+      if (!this.isValidFavorite(favorite)) issues.push('FAVORITE_INVALID');
     }
     return { ok: issues.length === 0, issues, fieldsCount: parts.length };
   }
 
   private validateText(text: string) {
     const entries = this.parseEntries(text);
-    const results = entries.map(e => ({ e, v: this.validateEntry(e.payload) }));
-    const invalid = results.filter(r => !r.v.ok);
+    const results = entries.map((e) => ({ e, v: this.validateEntry(e.payload) }));
+    const invalid = results.filter((r) => !r.v.ok);
     return { ok: invalid.length === 0, entries, invalid };
   }
 
   onImport() {
-    this.util.chooseImportFile().pipe(
-      filter((p): p is string => !!p),
-      switchMap((path) => this.util.readTextFile(path).pipe(map(text => ({ path, text })))),
-      map(({ path, text }) => ({ path, report: this.validateText(String(text ?? '')) })),
-      tap(({ report }) => {
-        if (!report.ok) {
-          const formatInvalidPreview = (items: Array<{ e: { line: number; index: number }; v: { issues: string[] } }>) =>
-            items
-              .slice(0, 5)
-              .map(r => `line ${r.e.line} idx ${r.e.index}: ${r.v.issues.join(', ')}`)
-              .join('\n');
-
-          const first = formatInvalidPreview(report.invalid);
-          this.showAlert(`Invalid live_streams.sii format (\ninvalid entries: ${report.invalid.length}/${report.entries.length}\n)\n\nExamples:\n${first}`);
-        }
-      }),
-      filter(({ report }) => report.ok),
-      switchMap(({ path }) => this.util.importLiveStreamsFromPath(path, 'live_streams.sii')),
-      filter((res) => !!res && !res.canceled),
-      switchMap(() => this.util.findGameChannels('live_streams.sii')),
-      tap((res) => {
-        this.modifiedChannels.set(JSON.parse(JSON.stringify(res.channels ?? [])));
-        // this.originalChannels.set(JSON.parse(JSON.stringify(res.channels ?? [])));
+    this.getImportedLivestreams().subscribe({
+      error: (e) => console.error('Import failed', e),
+      next: (channels) => {
+        this.modifiedChannels.set(channels);
         this.editingFields.clear();
-      })
-    ).subscribe({ error: (e) => console.error('Import failed', e) });
+      },
+    });
   }
 
   onImportFromEuroTruckSimulator() {
-    this.util.importLiveStreamsFromEuroTruckSimulator('live_streams.sii').pipe(
-      filter((res) => !!res && !res.canceled),  
-      switchMap(() => this.util.findGameChannels('live_streams.sii')),
-      tap((res) => {
-        this.modifiedChannels.set(null);
-        this.originalChannels.set(JSON.parse(JSON.stringify(res.channels ?? [])));
-        // this.modifiedFields.set(new Set());
+    this.getImportedLivestreamsFromEuroTruckSimulator().subscribe({
+      error: (e) => console.error('Import failed', e),
+      next: (channels) => {
+        this.modifiedChannels.set(channels);
         this.editingFields.clear();
-      })
-    ).subscribe({ error: (e) => console.error('Import from Euro Truck Simulator failed', e) });
+      },
+    });
+  }
+
+  getImportedLivestreams() {
+    return this.util.chooseImportFile().pipe(
+      filter((p): p is string => !!p),
+      switchMap((path) => this.util.readTextFile(path).pipe(map((text) => ({ path, text })))),
+      map(({ path, text }) => ({ path, report: this.validateText(String(text ?? '')) })),
+      tap(({ report }) => {
+        if (!report.ok) {
+          const formatInvalidPreview = (
+            items: Array<{ e: { line: number; index: number }; v: { issues: string[] } }>
+          ) =>
+            items
+              .slice(0, 5)
+              .map((r) => `line ${r.e.line} idx ${r.e.index}: ${r.v.issues.join(', ')}`)
+              .join('\n');
+
+          const first = formatInvalidPreview(report.invalid);
+          this.showAlert(
+            `Invalid live_streams.sii format (\ninvalid entries: ${report.invalid.length}/${report.entries.length}\n)\n\nExamples:\n${first}`
+          );
+        }
+      }),
+      filter(({ report }) => report.ok),
+      switchMap(({ path }) => this.util.importLiveStreamsFromPath(path, 'live_streams.sii'))
+    );
+  }
+
+  getImportedLivestreamsFromEuroTruckSimulator() {
+    return this.util.importLiveStreamsFromEuroTruckSimulator('live_streams.sii');
   }
 
   applyPendingEdits() {
     for (const [fieldKey, value] of this.editingFields.entries()) {
-          const [indexStr, field] = fieldKey.split('-');
-          const index = parseInt(indexStr);
-          const channels = this.visibleChannels();
-          const updatedChannels = channels.map(c => 
-            c.index === index ? { ...c, [field]: value } : c
-          );
-          this.modifiedChannels.set(updatedChannels);
-      }
-      
-      this.editingFields.clear();
+      const [indexStr, field] = fieldKey.split('-');
+      const index = parseInt(indexStr);
+      const channels = this.visibleChannels();
+      const updatedChannels = channels.map((c) =>
+        c.index === index ? { ...c, [field]: value } : c
+      );
+      this.modifiedChannels.set(updatedChannels);
+    }
+
+    this.editingFields.clear();
   }
 
   onSave() {
     this.applyPendingEdits();
 
-    if(!confirm('This will replace your existing Euro Truck Simulator 2 radio channels. \nAre you sure you want to continue? (Make sure your game is not running)')) {
-      this.util.refocusMainWindow();
+    // Export with the current (possibly modified) channel data
+    const currentChannels = this.visibleChannels();
+    console.log('currentChannels.length', currentChannels.length);
+    this.util
+      .exportLiveStreamsWithDataToEuroTruckSimulator(currentChannels)
+      .pipe(
+        catchError(() => {
+          console.error('exportLiveStreamsWithDataToEuroTruckSimulator');
+          return this.util.exportLiveStreamsWithDataToAppData(currentChannels);
+        }),
+        catchError(() => {
+          console.error('exportLiveStreamsWithDataToAppData');
+          return this.util.exportLiveStreamsWithData(
+            currentChannels,
+            'live_streams.sii',
+            'live_streams.sii'
+          );
+        })
+      )
+      .subscribe({
+        next: (res) => {
+          if (!res?.canceled) {
+            this.originalChannels.set(currentChannels);
+            this.modifiedChannels.set(null);
+            console.log('Exported to', res.destPath);
+          }
+        },
+        error: (e) => {
+          console.error('Export failed', e);
+          this.showAlert(`Export failed: ${e?.message || 'no e.message'}`);
+        },
+      });
+  }
 
-      return;
-    }
+  getConfirm(message: string) {
+    const confirmResult = confirm(message);
 
     this.util.refocusMainWindow();
 
-    // Export with the current (possibly modified) channel data
-    const currentChannels = this.visibleChannels();
-    this.util.exportLiveStreamsWithDataToEuroTruckSimulator(currentChannels).subscribe({
-      next: (res) => { 
-        if (!res?.canceled) {
-          this.originalChannels.set(currentChannels);
-          this.modifiedChannels.set(null);
-          console.log('Exported to', res.destPath);
-        }
-      },
-      error: (e) => {
-        console.error('Export failed', e);
-        this.showAlert(`Export failed: ${e?.message || 'no e.message'}`);
-      }
-    });
+    return confirmResult;
   }
 
   onExport() {
-    if(this.hasChanges()) {
-      const confirmExport = confirm('You have unsaved changes. Do you want to export the data without your pending changes?');
+    if (this.hasChanges()) {
+      const confirmExport = this.getConfirm(
+        'You have unsaved changes. Do you want to export the data without your pending changes?'
+      );
 
       if (!confirmExport) {
         return;
       }
-
-      this.util.refocusMainWindow();
     }
 
     // Export with the current (possibly modified) channel data
     const currentChannels = this.originalChannels();
-    this.util.exportLiveStreamsWithData(currentChannels, 'live_streams.sii', 'live_streams.sii').subscribe({
-      next: (res) => { 
-        if (!res?.canceled) {
-          console.log('Exported to', res.destPath);
-          this.showAlert(`Successfully exported live_streams.sii with updated favorites to:\n${res.destPath}`);
-        }
-      },
-      error: (e) => {
-        console.error('Export failed', e);
-        this.showAlert('Export failed. Please check the console for details.');
-      }
-    });
+    this.util
+      .exportLiveStreamsWithData(currentChannels, 'live_streams.sii', 'live_streams.sii')
+      .subscribe({
+        next: (res) => {
+          if (!res?.canceled) {
+            console.log('Exported to', res.destPath);
+            this.showAlert(`Successfully exported live_streams.sii to:\n${res.destPath}`);
+          }
+        },
+        error: (e) => {
+          console.error('Export failed', e);
+          this.showAlert('Export failed. Please check the console for details.');
+        },
+      });
   }
 
   ngOnInit() {
     this.loading.set(true);
-    this.util.importLiveStreamsFromEuroTruckSimulator('live_streams.sii').pipe(
-      filter((res) => !!res && !res.canceled),  
-      switchMap(() => this.util.findGameChannels('live_streams.sii')),
-      tap((res) => {
-        this.modifiedChannels.set(null);
-        this.originalChannels.set(JSON.parse(JSON.stringify(res.channels ?? [])));
-        // this.modifiedFields.set(new Set());
-        this.editingFields.clear();
-      })
-    ).subscribe({ error: (e) => console.error('Import from Euro Truck Simulator failed', e), next: () => {
-        this.loading.set(false);
-        this.loaded.set(true);
-    } });
+    this.getImportedLivestreamsFromEuroTruckSimulator()
+      .pipe(
+        catchError(() => {
+          return this.util.findGameChannels('live_streams.sii');
+        }),
+        catchError(() => {
+          return this.getImportedLivestreams();
+        })
+      )
+      .subscribe({
+        error: (e) => console.error('Import from Euro Truck Simulator failed', e),
+        next: (channels) => {
+          this.modifiedChannels.set(null);
+          this.originalChannels.set(channels);
+          this.editingFields.clear();
+          this.loading.set(false);
+          this.loaded.set(true);
+        },
+      });
   }
 }
