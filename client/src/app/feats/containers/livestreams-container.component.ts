@@ -40,6 +40,7 @@ export class LivestreamsContainerComponent implements OnInit {
   playingStreamUrl = signal<string | null>(null);
   loadingIndex = signal<number | null>(null);
   errorIndex = signal<number | null>(null);
+  protected showList = signal(true);
   protected audioElement: HTMLAudioElement | null = null;
   playingStreamName = computed(() => {
     const url = this.playingStreamUrl();
