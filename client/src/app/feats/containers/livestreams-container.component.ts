@@ -1,4 +1,16 @@
-import { Component, OnInit, signal, inject, NgZone, computed, ViewChildren, ElementRef, QueryList, Renderer2, effect } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  signal,
+  inject,
+  NgZone,
+  computed,
+  ViewChildren,
+  ElementRef,
+  QueryList,
+  Renderer2,
+  effect,
+} from '@angular/core';
 import { catchError, filter, map, switchMap, tap } from 'rxjs/operators';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -6,15 +18,31 @@ import { FormsModule } from '@angular/forms';
 import { LiveStreamsUtilFactoryService } from '../../live-streams-util-factory.service';
 import { defer, EMPTY, from, Subject } from 'rxjs';
 import { FavoriteCheckComponent } from '../../components/favorite-check/favorite-check.component';
+import {
+  CdkDrag,
+  CdkDragDrop,
+  CdkDropList,
+  CdkDragHandle,
+  CdkDragPreview,
+  CdkDragEnter,
+} from '@angular/cdk/drag-drop';
 
 @Component({
   selector: 'app-livestreams-container',
   standalone: true,
-  imports: [CommonModule, FormsModule, FavoriteCheckComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    FavoriteCheckComponent,
+    CdkDropList,
+    CdkDrag,
+    CdkDragHandle,
+    CdkDragPreview,
+  ],
   templateUrl: './livestreams-container.component.html',
 })
 export class LivestreamsContainerComponent implements OnInit {
-  @ViewChildren('channelRowElement') channelRowElements!: QueryList<ElementRef>
+  @ViewChildren('channelRowElement') channelRowElements!: QueryList<ElementRef>;
   private readonly util = inject(LiveStreamsUtilFactoryService);
   private readonly zone = inject(NgZone);
   private readonly renderer = inject(Renderer2);
@@ -45,8 +73,8 @@ export class LivestreamsContainerComponent implements OnInit {
     lang: 'EN',
     bitrate: '128',
     favorite: '1',
-    id: this.util.getRandomUuid()
-  }
+    id: this.util.getRandomUuid(),
+  };
   audioPlayerChannel = signal<Channel>(this.defaultEmptyChannel);
   newChannelFormData = signal<Channel>(this.defaultEmptyChannel);
   favoriteOnlyChecked = signal(true);
@@ -67,28 +95,60 @@ export class LivestreamsContainerComponent implements OnInit {
       if (audioPlayerChannel?.url) {
         this.loadAudioUrl(audioPlayerChannel.url);
 
-        this.audioElement?.play().catch((err) => {
-          if (this.loadingChannel()?.id === audioPlayerChannel.id) {
-            this.loadingChannel.set(null);
-            this.errorChannel.set(audioPlayerChannel);
-            console.error('Failed to play stream:', err);
-          }
-        }).then(() => {
-          if (audioPlayerChannel.id === this.loadingChannel()?.id) {
-            this.loadingChannel.set(null);
-          }
+        this.audioElement
+          ?.play()
+          .catch((err) => {
+            if (this.loadingChannel()?.id === audioPlayerChannel.id) {
+              this.loadingChannel.set(null);
+              this.errorChannel.set(audioPlayerChannel);
+              console.error('Failed to play stream:', err);
+            }
+          })
+          .then(() => {
+            if (audioPlayerChannel.id === this.loadingChannel()?.id) {
+              this.loadingChannel.set(null);
+            }
 
-          this.playingStreamUrl.set(audioPlayerChannel.url);
-        })
+            this.playingStreamUrl.set(audioPlayerChannel.url);
+          });
       }
-    })
+    });
   }
 
   // Add form related
   showAddForm = signal(false);
 
+  cdkDropListEntered(e: CdkDragEnter<Channel[], Channel[]>) {
+    console.log(e);
+  }
+
+  cdkDropListDropped(e: CdkDragDrop<Channel[]>) {
+    if (e.previousContainer !== e.container) {
+      return;
+    }
+
+    const currentChannel = this.visibleChannels().at(e.previousIndex);
+
+    if (currentChannel) {
+      this.removeChannel(currentChannel.index);
+      this.insertChannel({
+        ...currentChannel,
+        index: e.currentIndex,
+      });
+    }
+
+    setTimeout(() => {
+      const channel = this.channelRowElements.find((el, i) => i === e.currentIndex);
+
+      channel?.nativeElement.classList.add('bg-green-300');
+      setTimeout(() => {
+        channel?.nativeElement.classList.remove('bg-green-300');
+      }, 2000);
+    }, 0);
+  }
+
   initializeAudioPlayerChannel() {
-    this.audioPlayerChannel.set(this.defaultEmptyChannel)
+    this.audioPlayerChannel.set(this.defaultEmptyChannel);
   }
 
   toggleFavorite(channel: Channel | undefined | null, checked: boolean) {
@@ -190,7 +250,7 @@ export class LivestreamsContainerComponent implements OnInit {
     this.newChannelFormData.set({
       ...this.defaultEmptyChannel,
       index: this.getNextIndex(),
-      id: this.util.getRandomUuid()
+      id: this.util.getRandomUuid(),
     });
     this.showAddForm.set(true);
   }
@@ -217,7 +277,7 @@ export class LivestreamsContainerComponent implements OnInit {
   }
 
   playVisibleChannel(channel: Channel) {
-    this.favoriteOnlyChecked.set(channel.favorite === '1')
+    this.favoriteOnlyChecked.set(channel.favorite === '1');
     this.playStream(channel);
   }
 
@@ -260,51 +320,91 @@ export class LivestreamsContainerComponent implements OnInit {
   newChannelIndexChange(index: number) {
     this.newChannelFormData.set({
       ...this.newChannelFormData(),
-      index: index
-    })
+      index: index,
+    });
   }
 
   newChannelNamelChange(name: string) {
     this.newChannelFormData.set({
       ...this.newChannelFormData(),
-      name: name
-    })
+      name: name,
+    });
   }
 
   newChannelUrlChange(url: string) {
     this.newChannelFormData.set({
       ...this.newChannelFormData(),
-      url: url
-    })
+      url: url,
+    });
   }
 
   newChannelGenreChange(genre: string) {
     this.newChannelFormData.set({
       ...this.newChannelFormData(),
-      genre: genre
-    })
+      genre: genre,
+    });
   }
 
   newChannelLanguageChange(language: string) {
     this.newChannelFormData.set({
       ...this.newChannelFormData(),
-      lang: language
-    })
+      lang: language,
+    });
   }
 
   // Handle favorite checkbox change in add form
   onNewChannelFavoriteChange(isChecked: boolean) {
     this.newChannelFormData.set({
       ...this.newChannelFormData(),
-      favorite: isChecked ? '1' : '0'
-    })
+      favorite: isChecked ? '1' : '0',
+    });
   }
 
   newChannelBitrateChange(bitrate: string) {
     this.newChannelFormData.set({
       ...this.newChannelFormData(),
-      bitrate: bitrate || '0'
-    })
+      bitrate: bitrate || '0',
+    });
+  }
+
+  insertChannel(channel: Channel) {
+    const channels = this.visibleChannels();
+
+    // If inserting at an existing index, shift all subsequent entries up
+    const updatedChannels = [...channels];
+    const existingAtIndex = updatedChannels.find((c) => c.index === channel.index);
+
+    if (existingAtIndex) {
+      // Shift all channels at or after this index up by 1
+      updatedChannels.forEach((c) => {
+        if (c.index >= channel.index) {
+          c.index++;
+        }
+      });
+    }
+
+    // Add the new channel
+    updatedChannels.push(channel);
+
+    // Sort by index
+    updatedChannels.sort((a, b) => a.index - b.index);
+
+    // Update channels and track as modified
+    this.modifiedChannels.set(updatedChannels);
+
+    if (this.audioPlayerChannel()?.id === channel.id) {
+      // this.unloadAudioUrl();
+      this.initializeAudioPlayerChannel();
+      this.playStream(channel);
+      setTimeout(() => {
+        this.channelRowElements
+          .find((element, i) => i === channel.index)
+          ?.nativeElement?.scrollIntoView({
+            behaviour: 'smooth',
+            block: 'center',
+          });
+      }, 0);
+    }
   }
 
   // Add the new channel
@@ -326,7 +426,7 @@ export class LivestreamsContainerComponent implements OnInit {
     }
     this.newChannelFormData.set({
       ...this.newChannelFormData(),
-      index: newIndex
+      index: newIndex,
     });
 
     // Validate bitrate if provided
@@ -335,42 +435,7 @@ export class LivestreamsContainerComponent implements OnInit {
       return;
     }
 
-    const channels = this.visibleChannels();
-
-    // If inserting at an existing index, shift all subsequent entries up
-    const updatedChannels = [...channels];
-    const existingAtIndex = updatedChannels.find((c) => c.index === newIndex);
-
-    if (existingAtIndex) {
-      // Shift all channels at or after this index up by 1
-      updatedChannels.forEach((c) => {
-        if (c.index >= newIndex) {
-          c.index++;
-        }
-      });
-    }
-
-    // Add the new channel
-    updatedChannels.push(this.newChannelFormData());
-
-    // Sort by index
-    updatedChannels.sort((a, b) => a.index - b.index);
-
-    // Update channels and track as modified
-    this.modifiedChannels.set(updatedChannels);
-
-    if (this.audioPlayerChannel()?.id === this.newChannelFormData().id) {
-      // this.unloadAudioUrl();
-      this.initializeAudioPlayerChannel();
-      this.playStream(this.newChannelFormData());
-      setTimeout(() => {
-        console.log('ELEMENT', newIndex, this.channelRowElements.length)
-        this.channelRowElements.find((element, i) => i === newIndex)?.nativeElement?.scrollIntoView({
-          behaviour: 'smooth',
-          block: 'center'
-        });
-      }, 0);
-    }
+    this.insertChannel(this.newChannelFormData());
 
     // Reset the form
     this.newChannelFormData.set(this.defaultEmptyChannel);
@@ -392,8 +457,10 @@ export class LivestreamsContainerComponent implements OnInit {
     const channels = this.visibleChannels();
     const currentIndex = channels.findIndex((c) => c.id === channel.id);
 
-    const channelToPlay = this.favoriteOnlyChecked() ? this.visibleChannels().find(c => c.index > currentIndex && c.favorite === '1') || [...this.visibleChannels()].find(c => c.favorite === '1') : channels[currentIndex + 1] || this.visibleChannels().at(0);
-
+    const channelToPlay = this.favoriteOnlyChecked()
+      ? this.visibleChannels().find((c) => c.index > currentIndex && c.favorite === '1') ||
+        [...this.visibleChannels()].find((c) => c.favorite === '1')
+      : channels[currentIndex + 1] || this.visibleChannels().at(0);
 
     if (!channelToPlay) {
       return;
@@ -406,9 +473,14 @@ export class LivestreamsContainerComponent implements OnInit {
       return;
     }
     const channels = this.visibleChannels();
-    const currentIndex = channels.findIndex((c) => c.id === channel.id)
+    const currentIndex = channels.findIndex((c) => c.id === channel.id);
 
-    const channelToPlay = this.favoriteOnlyChecked() ? [...this.visibleChannels()].reverse().find(c => c.index < currentIndex && c.favorite === '1') || [...this.visibleChannels()].reverse().find(c => c.favorite === '1') : channels[currentIndex - 1] || this.visibleChannels().at(this.visibleChannels().length - 1);
+    const channelToPlay = this.favoriteOnlyChecked()
+      ? [...this.visibleChannels()]
+          .reverse()
+          .find((c) => c.index < currentIndex && c.favorite === '1') ||
+        [...this.visibleChannels()].reverse().find((c) => c.favorite === '1')
+      : channels[currentIndex - 1] || this.visibleChannels().at(this.visibleChannels().length - 1);
 
     if (!channelToPlay) {
       return;
@@ -461,10 +533,12 @@ export class LivestreamsContainerComponent implements OnInit {
 
     this.loadAudioChannel(channel);
 
-    this.channelRowElements.find((element, i) => i === channel.index)?.nativeElement?.scrollIntoView({
-      behaviour: 'smooth',
-      block: 'center'
-    });
+    this.channelRowElements
+      .find((element, i) => i === channel.index)
+      ?.nativeElement?.scrollIntoView({
+        behaviour: 'smooth',
+        block: 'center',
+      });
   }
 
   showAlert(message: string) {
