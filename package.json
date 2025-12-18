@@ -1,7 +1,7 @@
 {
   "name": "dukes-ets-editor",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "scripts": {
     "channels:find": "node utils/live-streams/find-current-channels.js",
