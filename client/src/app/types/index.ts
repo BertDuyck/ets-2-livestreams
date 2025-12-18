@@ -6,5 +6,6 @@ type Channel = {
   genre: string;
   lang: string;
   bitrate: string;
-  favorite: string; // '0' | '1'
+  favorite: string; // '0' | '1',
+  id: string
 };

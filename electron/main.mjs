@@ -2,6 +2,7 @@ import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { fstat } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const isDev = !app.isPackaged;
@@ -73,6 +74,8 @@ app.whenReady().then(() => {
     if (res.canceled || !res.filePaths || !res.filePaths[0]) return null;
     return res.filePaths[0];
   });
+
+  ipcMain.handle('get-app-random-uuid', () => randomUUID());
 
   ipcMain.on('refocus-main-window', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);

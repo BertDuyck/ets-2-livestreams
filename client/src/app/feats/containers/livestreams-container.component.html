@@ -5,12 +5,12 @@
       <h1 class="text-2xl font-semibold tracking-tight">Radio Editor</h1>
     </header>
 
-    <div class="flex items-center gap-6 py-1 " *ngIf="visibleChannels().length">
+    <div class="flex items-center gap-6 py-1 "  *ngIf="audioPlayerChannel().url">
         <div class="flex items-center gap-2 px-4 py-1 rounded-md border border-gray-300 bg-white dark:bg-gray-900 dark:text-blue-300 w-full justify-between">
-          <div class="flex gap-2 items-center">
-            <p class="text-blue-800 dark:text-gray-100"><strong *ngIf="playingChannel(); let playingC">{{ playingC.index + 1 }}</strong></p>
+          <div class="flex gap-2 items-center  flex-1">
+            <p class="text-blue-800 dark:text-gray-100 font-bold"><strong *ngIf="audioPlayerChannel(); let playingC">{{ playingC.index + 1 }}</strong></p>
 
-          <svg *ngIf="quedChannel() && !playingChannel()" class="animate-spin h-3 w-3"
+          <svg *ngIf="audioPlayerChannel() && loadingChannel()?.id === audioPlayerChannel().id" class="animate-spin h-3 w-3"
             xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor"
@@ -19,24 +19,27 @@
           </svg>
 
           <div class="flex gap-3 items-center">
-            <p>{{ playingChannel()?.name || quedChannel()?.name }}</p>
+            <p class="font-bold">{{ audioPlayerChannel().name }}</p>
 
-            <app-favorite-check [checked]="playingChannel()?.favorite === '1'"
-              (checkedChange)="toggleFavorite(playingChannel(), $event)"></app-favorite-check>
+            <p class="text-gray-500 dark:text-blue-500" *ngIf="audioPlayerChannel().genre">---{{audioPlayerChannel().genre}}---</p>
+
+            <app-favorite-check [checked]="audioPlayerChannel().favorite === '1'"
+              (checkedChange)="toggleFavorite(audioPlayerChannel(), $event)"></app-favorite-check>
           </div>
           </div>
 
-          <div class="flex items-center">
-            <button (click)="playPreviousChannel(playingChannel())">
+          <div class="flex flex-col gap-1">
+            <div class="flex items-center">
+
+            <button (click)="playPreviousChannel(audioPlayerChannel())">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-6">
               <path fill-rule="evenodd"
                 d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25Zm-4.28 9.22a.75.75 0 0 0 0 1.06l3 3a.75.75 0 1 0 1.06-1.06l-1.72-1.72h5.69a.75.75 0 0 0 0-1.5h-5.69l1.72-1.72a.75.75 0 0 0-1.06-1.06l-3 3Z"
                 clip-rule="evenodd" />
             </svg>
-          </button>
+            </button>
 
-          <button (click)="audioElement?.paused ? audioElement?.play() : audioElement?.pause()"
-            [disabled]="!playingChannel()">
+            <button [disabled]="!audioPlayerChannel()" (click)="playRadioPlayer()">
             <svg *ngIf="!audioElement || audioElement.paused; else pauseTmpl" xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24" fill="currentColor" class="size-6">
               <path fill-rule="evenodd"
@@ -51,17 +54,17 @@
                   clip-rule="evenodd" />
               </svg>
             </ng-template>
-          </button>
+            </button>
 
-          <button (click)="playNextChannel(playingChannel())">
+            <button (click)="playNextChannel(audioPlayerChannel())">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-6">
               <path fill-rule="evenodd"
                 d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25Zm4.28 10.28a.75.75 0 0 0 0-1.06l-3-3a.75.75 0 1 0-1.06 1.06l1.72 1.72H8.25a.75.75 0 0 0 0 1.5h5.69l-1.72 1.72a.75.75 0 1 0 1.06 1.06l3-3Z"
                 clip-rule="evenodd" />
             </svg>
-          </button>
+            </button>
 
-          <div class="flex items-center gap-1">
+            <div class="flex items-center gap-1">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
               stroke="currentColor" class="size-4">
               <path stroke-linecap="round" stroke-linejoin="round"
@@ -78,6 +81,13 @@
                 d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
             </svg>
           </div>
+          </div>
+
+          <div class="flex items-center gap-1 text-gray-900 dark:text-gray-100 text-xs mr-0 ml-auto">
+            <label>Favorite only</label>
+            <input type="checkbox" class="text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600" [checked]="favoriteOnlyChecked()" (change)="favoriteOnlyChecked.set($event.target.checked)"/>
+          </div>
+          
           </div>
         </div>
       </div>
@@ -130,71 +140,74 @@
       <div class="flex items-end gap-2">
         <div class="flex-1 grid grid-cols-7 gap-2">
           <div>
-            <label class="block text-xs font-medium text-gray-700 mb-1">Index</label>
-            <input type="number" [(ngModel)]="newChannel.index" [ngModelOptions]="{standalone: true}" [min]="0"
-              [max]="getNextIndex()"
+            <label class="block text-xs font-medium text-gray-700 mb-1">Number</label>
+            <input type="number" [ngModel]="newChannelFormData().index + 1" [ngModelOptions]="{standalone: true}" [min]="1"  (change)="newChannelIndexChange(+$event.target.value -1)"
+              [max]="this.visibleChannels().length + 1"
               class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm">
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-700 mb-1">Name *</label>
-            <input type="text" [(ngModel)]="newChannel.name" [ngModelOptions]="{standalone: true}"
+            <input type="text" [ngModel]="newChannelFormData().name" [ngModelOptions]="{standalone: true}" (change)="newChannelNamelChange($event.target.value)"
               placeholder="Station Name"
               class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm">
           </div>
           <div class="col-span-2">
             <label class="block text-xs font-medium text-gray-700 mb-1">URL *</label>
-            <input type="url" [(ngModel)]="newChannel.url" [ngModelOptions]="{standalone: true}"
+            <input type="url" [ngModel]="newChannelFormData().url" [ngModelOptions]="{standalone: true}" (change)="newChannelUrlChange($event.target.value)"
               placeholder="http://..."
               class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm">
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-700 mb-1">Genre</label>
-            <input type="text" [(ngModel)]="newChannel.genre" [ngModelOptions]="{standalone: true}"
-              placeholder="Pop, Rock"
+            <input type="text" [ngModel]="newChannelFormData().genre" [ngModelOptions]="{standalone: true}" (change)="newChannelGenreChange($event.target.value)"
+              placeholder="Various"
               class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm">
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-700 mb-1">Lang</label>
-            <input type="text" [(ngModel)]="newChannel.lang" [ngModelOptions]="{standalone: true}" maxlength="5"
+            <input type="text" [ngModel]="newChannelFormData().lang" [ngModelOptions]="{standalone: true}" maxlength="5" (change)="newChannelLanguageChange($event.target.value)"
               placeholder="EN"
               class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm text-center">
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-700 mb-1">Bitrate</label>
-            <input type="text" [(ngModel)]="newChannel.bitrate" [ngModelOptions]="{standalone: true}" pattern="[0-9]*"
+            <input type="text" [ngModel]="newChannelFormData().bitrate" [ngModelOptions]="{standalone: true}" pattern="[0-9]*"
+              (change)="newChannelBitrateChange($event.target.value)"
               placeholder="128"
               class="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm text-center">
           </div>
         </div>
         <div class="flex items-center gap-2">
           <label class="flex items-center gap-1">
-            <app-favorite-check [checked]="newChannel.favorite === '1'"
+            <app-favorite-check [checked]="newChannelFormData().favorite === '1'"
               (checkedChange)="onNewChannelFavoriteChange($event)"></app-favorite-check>
           </label>
-          <button type="button" (click)="testStreamUrl(newChannel.url || '')" [disabled]="!newChannel.url"
-            [class.bg-red-500]="playingStreamUrl() === newChannel.url"
-            [class.hover:bg-red-600]="playingStreamUrl() === newChannel.url" [class.bg-orange-500]="errorIndex() === -1"
-            [class.hover:bg-orange-600]="errorIndex() === -1"
-            [class.bg-gray-900]="playingStreamUrl() !== newChannel.url && loadingIndex() !== -1 && errorIndex() !== -1"
-            [class.hover:bg-black/80]="loadingIndex() === -1 || !newChannel.url"
-            [class.bg-gray-400]="loadingIndex() === -1"
-            class="inline-flex items-center justify-center gap-1 rounded text-white text-xs px-1 py-1 w-12">
-            <svg *ngIf="loadingIndex() === -1" class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg"
-              fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-              </path>
-            </svg>
-            <svg *ngIf="errorIndex() === -1 && loadingIndex() !== -1" class="h-3 w-3" xmlns="http://www.w3.org/2000/svg"
-              fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span *ngIf="loadingIndex() !== -1 && errorIndex() !== -1">{{ playingStreamUrl() === newChannel.url ? 'Stop'
-              : 'Test' }}</span>
-            <span *ngIf="errorIndex() === -1 && loadingIndex() !== -1">Retry</span>
-          </button>
+
+          <button type="button" (click)="playStream(newChannelFormData())" style="width: 100px;"
+                  [class.bg-red-500]="audioPlayerChannel().id === newChannelFormData().id"
+                  [class.hover:bg-red-600]="audioPlayerChannel().id === newChannelFormData().id"
+                  [class.bg-orange-500]="audioPlayerChannel().id === newChannelFormData().id && audioPlayerChannel().id === errorChannel()?.id"
+                  [class.hover:bg-orange-600]="audioPlayerChannel().id === newChannelFormData().id && audioPlayerChannel().id === errorChannel()?.id"
+                  [class.bg-gray-900]="audioPlayerChannel().id !== newChannelFormData().id"
+                  [class.hover:bg-black/80]="audioPlayerChannel().id !== newChannelFormData().id"
+                  [class.bg-gray-400]="audioPlayerChannel().id === newChannelFormData().id && loadingChannel()?.id === newChannelFormData().id"
+                  class="inline-flex items-center justify-center gap-1 rounded text-white text-xs px-1 py-1 w-12">
+                  <svg *ngIf="loadingChannel()?.id === newChannelFormData().id" class="animate-spin h-3 w-3"
+                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                    </path>
+                  </svg>
+                  <svg *ngIf="audioPlayerChannel().id === newChannelFormData().id && errorChannel()?.id === newChannelFormData().id && loadingChannel()?.id !== newChannelFormData().id" class="h-3 w-3"
+                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span *ngIf="errorChannel()?.id !== newChannelFormData().id">{{ audioPlayerChannel().id === newChannelFormData().id ? 'Stop' : 'Play' }}</span>
+                  <span *ngIf="audioPlayerChannel().id === newChannelFormData().id && errorChannel()?.id === newChannelFormData().id && loadingChannel()?.id !== newChannelFormData().id">Retry</span>
+                  <span *ngIf="audioPlayerChannel().id !== newChannelFormData().id && loadingChannel()?.id === newChannelFormData().id">Stop</span>
+            </button>
 
           <button type="button" (click)="addChannel()"
             class="inline-flex items-center gap-1 rounded-md bg-green-600 text-white text-sm px-3 py-1.5 hover:bg-green-700">
@@ -245,7 +258,24 @@
                   </svg>
                 </button>
               </th>
-              <th class="py-2 px-2 min-w-[300px]">URL</th>
+              <th class="py-2 px-2 min-w-[300px]">
+                URL
+                <button class="text-blue-500" (click)="sortChannelsByField('url', 'asc')">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                    stroke="currentColor" class="size-4">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 18.75 7.5-7.5 7.5 7.5" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 7.5-7.5 7.5 7.5" />
+                  </svg>
+                </button>
+
+                <button class="text-blue-500" (click)="sortChannelsByField('url', 'desc')">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                    stroke="currentColor" class="size-4">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                      d="m4.5 5.25 7.5 7.5 7.5-7.5m-15 6 7.5 7.5 7.5-7.5" />
+                  </svg>
+                </button>
+              </th>
               <th class="py-2 px-2 min-w-[100px]">Genre
                 <button class="text-blue-500" (click)="sortChannelsByField('genre', 'asc')">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
@@ -287,8 +317,10 @@
           </thead>
           <tbody class="bg-gray-50 dark:bg-gray-700  dark:text-gray-100">
             <tr *ngFor="let ch of visibleChannels()" class="border-b border-gray-200 dark:border-blue-300"
-              [class.bg-blue-200]="playingStreamUrl() === ch.url"
-              [class.dark:bg-blue-800]="playingStreamUrl() === ch.url">
+              [class.bg-blue-200]="audioPlayerChannel().id === ch.id"
+              [class.dark:bg-blue-800]="audioPlayerChannel().id === ch.id"
+              #channelRowElement
+              [attr.channelId]="ch.id">
               <td class="py-2 px-2 text-xs">{{ ch.index + 1 }}</td>
               <td class="py-1 px-2">
                 <div class="flex items-center gap-1">
@@ -375,30 +407,29 @@
               </td>
               <td class="py-1 px-1">
                 <button type="button" (click)="playStream(ch)" style="width: 100px;"
-                  [class.bg-red-500]="playingStreamUrl() === ch.url"
-                  [class.hover:bg-red-600]="playingStreamUrl() === ch.url"
-                  [class.bg-orange-500]="errorIndex() === ch.index"
-                  [class.hover:bg-orange-600]="errorIndex() === ch.index"
-                  [class.bg-gray-900]="playingStreamUrl() !== ch.url && loadingIndex() !== ch.index && errorIndex() !== ch.index"
-                  [class.hover:bg-black/80]="playingStreamUrl() !== ch.url && loadingIndex() !== ch.index && errorIndex() !== ch.index"
-                  [class.bg-gray-400]="loadingIndex() === ch.index"
+                  [class.bg-red-500]="audioPlayerChannel().id === ch.id"
+                  [class.hover:bg-red-600]="audioPlayerChannel().id === ch.id"
+                  [class.bg-orange-500]="audioPlayerChannel().id === ch.id && audioPlayerChannel().id === errorChannel()?.id"
+                  [class.hover:bg-orange-600]="audioPlayerChannel().id === ch.id && audioPlayerChannel().id === errorChannel()?.id"
+                  [class.bg-gray-900]="audioPlayerChannel().id !== ch.id"
+                  [class.hover:bg-black/80]="audioPlayerChannel().id !== ch.id"
+                  [class.bg-gray-400]="audioPlayerChannel().id === ch.id && loadingChannel()?.id === ch.id"
                   class="inline-flex items-center justify-center gap-1 rounded text-white text-xs px-1 py-1 w-12">
-                  <svg *ngIf="loadingIndex() === ch.index" class="animate-spin h-3 w-3"
+                  <svg *ngIf="loadingChannel()?.id === ch.id" class="animate-spin h-3 w-3"
                     xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor"
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                     </path>
                   </svg>
-                  <svg *ngIf="errorIndex() === ch.index && loadingIndex() !== ch.index" class="h-3 w-3"
+                  <svg *ngIf="errorChannel()?.id === ch.id && loadingChannel()?.id !== ch.id" class="h-3 w-3"
                     xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span *ngIf="loadingIndex() !== ch.index && errorIndex() !== ch.index">{{ playingStreamUrl() ===
-                    ch.url ? 'Stop' : 'Play' }}</span>
-                  <span *ngIf="errorIndex() === ch.index && loadingIndex() !== ch.index">Retry</span>
-                  <span *ngIf="loadingIndex() === ch.index">Stop</span>
+                  <span *ngIf="errorChannel()?.id !== ch.id">{{ audioPlayerChannel().id === ch.id ? 'Stop' : 'Play' }}</span>
+                  <span *ngIf="audioPlayerChannel().id !== ch.id && errorChannel()?.id === ch.id && loadingChannel()?.id !== ch.id">Retry</span>
+                  <span *ngIf="audioPlayerChannel().id !== ch.id && loadingChannel()?.id === ch.id">Stop</span>
                 </button>
               </td>
               <td class="py-1 px-1">

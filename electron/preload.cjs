@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 const { resolve, join, isAbsolute, dirname } = require("node:path");
 const { readFileSync } = require("node:fs");
 const fs = require("node:fs/promises");
+const { randomUUID } = require("node:crypto");
 
 // Embed the channel parsing logic directly to avoid dynamic import issues in production
 function parseChannels(filePath) {
@@ -21,6 +22,8 @@ function parseChannels(filePath) {
       }
     }
 
+    const channelsSet = new Set();
+
     return entries
       .sort((a, b) => a.idx - b.idx)
       .map((e) => {
@@ -33,7 +36,7 @@ function parseChannels(filePath) {
           bitrate = "",
           favorite = "0",
         ] = fields;
-        return { index: e.idx, url, name, genre, lang, bitrate, favorite };
+        return { index: e.idx, url, name, genre, lang, bitrate, favorite, id: randomUUID() };
       });
   } catch (error) {
     console.error("Error parsing channels:", error);
@@ -61,6 +64,9 @@ function findCurrentChannels(filePath, search) {
 }
 
 contextBridge.exposeInMainWorld("api", {
+  getRandomUuid() {
+    return ipcRenderer.invoke('get-app-random-uuid');
+  },
   /**
    * @returns {Promise<string>}
    */
@@ -260,20 +266,6 @@ contextBridge.exposeInMainWorld("api", {
             const payload = `${channel.url}|${channel.name}|${channel.genre}|${channel.lang}|${channel.bitrate}|${channel.favorite}`;
             updatedLines.push(`${prefix}${payload}${suffix}`);
           }
-
-          // const prefix = match[1];
-          // const index = Number(match[2]);
-          // const suffix = match[4] || '"';
-
-          // const channel = channelMap.get(index);
-          // if (channel) {
-          //   // Format the channel data with pipe delimiters
-          //   const payload = `${channel.url}|${channel.name}|${channel.genre}|${channel.lang}|${channel.bitrate}|${channel.favorite}`;
-          //   updatedLines.push(`${prefix}${payload}${suffix}`);
-          // } else {
-          //   // Keep original line if no update for this index
-          //   updatedLines.push(line);
-          // }
         }
         if (!match) {
           if (line.match(channelCountRegex)) {

@@ -15,15 +15,7 @@ export interface SearchOptions {
 export interface ChannelResult {
   total: number;
   filteredCount: number;
-  channels: Array<{
-    index: number;
-    url: string;
-    name: string;
-    genre: string;
-    lang: string;
-    bitrate: string;
-    favorite: string; // '0' | '1'
-  }>;
+  channels: Channel[];
 }
 
 /**
@@ -34,6 +26,10 @@ export interface ChannelResult {
 export class LiveStreamsUtilFactoryService {
   /** Default empty result for channels */
   private readonly emptyResult: ChannelResult = { total: 0, filteredCount: 0, channels: [] };
+
+  getRandomUuid(): string {
+    return (window as any).api.getRandomUuid()
+  }
 
   /**
    * Find current channels parsed from live_streams.sii
