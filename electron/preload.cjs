@@ -225,7 +225,6 @@ contextBridge.exposeInMainWorld("api", {
     sourcePath = "live_streams.sii",
     destinationPath = "live_streams.sii"
   ) {
-    try {
       if (!isAbsolute(sourcePath)) {
         const appPath = await this.getAppPath();
         sourcePath = join(appPath, sourcePath);
@@ -302,10 +301,7 @@ contextBridge.exposeInMainWorld("api", {
       await fs.writeFile(destPath, updatedLines.join("\n"), "utf8");
 
       return { canceled: false, destPath };
-    } catch (error) {
-      console.error("Export error:", error);
-      return { canceled: true, error: error.message };
-    }
+    
   },
 
   async importLiveStreamsFromEuroTruckSimulator(
