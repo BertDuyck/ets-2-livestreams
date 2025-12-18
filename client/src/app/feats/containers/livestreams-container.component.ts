@@ -94,7 +94,7 @@ export class LivestreamsContainerComponent implements OnInit {
 
       console.log('audioPlayerChannel', audioPlayerChannel);
 
-      if (audioPlayerChannel?.url) {
+      if (audioPlayerChannel?.url && this.audioElement?.src !== audioPlayerChannel?.url.replace(/^(https?:\/\/[^\/:]+):80(\/|$)/i, '$1$2')) {
         this.loadAudioUrl(audioPlayerChannel.url);
 
         this.audioElement
@@ -156,6 +156,13 @@ export class LivestreamsContainerComponent implements OnInit {
       c.url === channel.url ? { ...c, favorite: checked ? '1' : '0' } : c
     );
     this.modifiedChannels.set(updatedChannels);
+
+    if(this.audioPlayerChannel().id === channel.id) {
+      this.audioPlayerChannel.set({
+        ...this.audioPlayerChannel(),
+        favorite: checked ? '1' : '0'
+      })
+    }
   }
 
   // Store temporary edit value without updating the signal
