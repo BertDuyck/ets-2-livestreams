@@ -26,6 +26,7 @@ import {
   CdkDragPreview,
   CdkDragEnter,
 } from '@angular/cdk/drag-drop';
+import { CdkScrollable } from '@angular/cdk/scrolling';
 
 @Component({
   selector: 'app-livestreams-container',
@@ -38,6 +39,7 @@ import {
     CdkDrag,
     CdkDragHandle,
     CdkDragPreview,
+    CdkScrollable
   ],
   templateUrl: './livestreams-container.component.html',
 })
@@ -117,10 +119,6 @@ export class LivestreamsContainerComponent implements OnInit {
 
   // Add form related
   showAddForm = signal(false);
-
-  cdkDropListEntered(e: CdkDragEnter<Channel[], Channel[]>) {
-    console.log(e);
-  }
 
   cdkDropListDropped(e: CdkDragDrop<Channel[]>) {
     if (e.previousContainer !== e.container) {

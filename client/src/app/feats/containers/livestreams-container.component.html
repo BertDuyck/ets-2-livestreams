@@ -235,7 +235,8 @@
         [&::-webkit-scrollbar-track]:bg-gray-100
         [&::-webkit-scrollbar-thumb]:bg-gray-300
         dark:[&::-webkit-scrollbar-track]:bg-gray-900
-        dark:[&::-webkit-scrollbar-thumb]:bg-gray-500">
+        dark:[&::-webkit-scrollbar-thumb]:bg-gray-500"
+        cdkScrollable>
 
         <table *ngIf="visibleChannels().length" class="min-w-[900px] w-full text-sm table-auto border-collapse">
           <thead class="text-left bg-gray-200 dark:bg-gray-900 dark:text-blue-300 sticky top-0 z-10">
@@ -315,7 +316,7 @@
               <th class="py-2 px-2 w-16">Actions</th>
             </tr>
           </thead>
-          <tbody class="bg-gray-50 dark:bg-gray-700  dark:text-gray-100" cdkDropList (cdkDropListDropped)="cdkDropListDropped($event)" [cdkDropListData]="visibleChannels()" (cdkDropListEntered)="cdkDropListEntered($event)">
+          <tbody class="bg-gray-50 dark:bg-gray-700  dark:text-gray-100" cdkDropList (cdkDropListDropped)="cdkDropListDropped($event)" [cdkDropListData]="visibleChannels()">
             <tr *ngFor="let ch of visibleChannels()" class="border-b border-gray-200 dark:border-blue-300"
               [class.bg-blue-200]="audioPlayerChannel().id === ch.id"
               [class.dark:bg-blue-800]="audioPlayerChannel().id === ch.id"
