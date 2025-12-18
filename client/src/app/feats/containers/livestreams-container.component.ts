@@ -25,6 +25,8 @@ import {
   CdkDragHandle,
   CdkDragPreview,
   CdkDragEnter,
+  CdkDragStart,
+  CdkDragRelease,
 } from '@angular/cdk/drag-drop';
 import { CdkScrollable } from '@angular/cdk/scrolling';
 
@@ -120,7 +122,20 @@ export class LivestreamsContainerComponent implements OnInit {
   // Add form related
   showAddForm = signal(false);
 
+  cdkDragStarted(e: CdkDragStart) {
+    e.source.element.nativeElement.classList.add('bg-green-300')
+    console.log('DRAG STARTED', e.source);
+    // const channel = this.channelRowElements.find((el, i) => i === e.currentIndex);
+  }
+
+  cdkDragReleased(e: CdkDragRelease) {
+    e.source.element.nativeElement.classList.remove('bg-green-300')
+    console.log('DRAG STARTED', e);
+    // const channel = this.channelRowElements.find((el, i) => i === e.currentIndex);
+  }
+
   cdkDropListDropped(e: CdkDragDrop<Channel[]>) {
+    console.log(e);
     if (e.previousContainer !== e.container) {
       return;
     }
@@ -733,15 +748,7 @@ export class LivestreamsContainerComponent implements OnInit {
   }
 
   onExport() {
-    if (this.hasChanges()) {
-      const confirmExport = this.getConfirm(
-        'You have unsaved changes. Do you want to export the data without your pending changes?'
-      );
-
-      if (!confirmExport) {
-        return;
-      }
-    }
+    this.applyPendingEdits();
 
     // Export with the current (possibly modified) channel data
     const currentChannels = this.originalChannels();

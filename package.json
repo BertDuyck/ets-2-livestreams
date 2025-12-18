@@ -16,7 +16,9 @@
     "clean": "rimraf dist || echo \"Warning: Could not clean build folders\"",
     "build:renderer": "cd client && ng build",
     "build:electron": "(npm run clean || true) && npm run build:renderer && electron-builder --win --x64 --ia32",
-    "build": "npm run build:electron"
+    "build": "npm run build:electron",
+    "release": "npm run build && electron-builder --win --x64 --ia32 --publish always",
+    "release:draft": "npm run build && electron-builder --win --x64 --ia32 --publish draft"
   },
   "devDependencies": {
     "@angular/cli": "^21.0.3",
@@ -28,7 +30,7 @@
     "wait-on": "^8.0.5"
   },
   "main": "electron/main.mjs",
-    "build": {
+  "build": {
       "appId": "com.dukes-ets-editor.app",
       "productName": "Dukes ETS Editor",
       "files": [
@@ -45,11 +47,16 @@
       },
       "win": {
       "target": [
-        "dir", "nsis"
+        "dir", "nsis", "zip"
       ],
       "certificateFile": null,
       "certificatePassword": null,
       "sign": false
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "BertDuyck",
+      "repo": "ets-2-livestreams"
     },
     "nsis": {
       "oneClick": false,
