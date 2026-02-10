@@ -32,7 +32,7 @@
   "main": "electron/main.mjs",
   "build": {
       "appId": "com.dukes-ets-editor.app",
-      "productName": "Dukes ETS Editor",
+      "productName": "Dukes ETS Radio Editor",
       "files": [
       "electron/**",
       "client/dist/**",
