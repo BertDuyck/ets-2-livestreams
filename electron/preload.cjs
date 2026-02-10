@@ -72,11 +72,15 @@ contextBridge.exposeInMainWorld("api", {
    */
   async getAppPath() {
     const appPath = await ipcRenderer.invoke("get-app-path");
-    // // Check if we're in production (app.asar)
+    // Check if we're in production (app.asar)
     if (appPath.includes("app.asar")) {
-      // Return the resources directory where the unpacked files are
+      // Return the resources directory where extraResources files are placed
+      // Structure: Dukes ETS Radio Editor/resources/app.asar
+      // We want: Dukes ETS Radio Editor/resources/
       return dirname(dirname(appPath));
     }
+    // In development, return project root
+    // File will be at: electron/live_streams.sii
     return appPath;
   },
 

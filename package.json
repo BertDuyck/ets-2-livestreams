@@ -37,12 +37,16 @@
       "electron/**",
       "client/dist/**",
       "utils/**",
-      "package.json",
-      "electron/live_streams.sii"
+      "package.json"
+      ],
+      "extraResources": [
+      {
+        "from": "electron/live_streams.sii",
+        "to": "live_streams.sii"
+      }
       ],
       "asarUnpack": [
-      "utils/**/*.js",
-      "electron/live_streams.sii"
+      "utils/**/*.js"
       ],
       "directories": {
       "buildResources": "assets"
