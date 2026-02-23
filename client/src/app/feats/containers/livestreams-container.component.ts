@@ -55,8 +55,6 @@ export class LivestreamsContainerComponent implements OnInit {
   visibleChannels = computed(() => {
     return this.modifiedChannels() || this.originalChannels();
   });
-  editingFields = new Map<string, string>(); // Temporary editing values
-  modifiedFields = signal<Set<string>>(new Set());
   total = signal(0);
   loading = signal(true);
   loaded = signal(false);
@@ -181,81 +179,9 @@ export class LivestreamsContainerComponent implements OnInit {
     }
   }
 
-  // Store temporary edit value without updating the signal
-  onFieldEdit(index: number, field: keyof Channel, event: Event) {
-    const value = (event.target as HTMLInputElement).value;
-    const fieldKey = `${index}-${field}`;
-    this.editingFields.set(fieldKey, value);
-  }
-
-  // Handle keyboard events on input fields
-  onFieldKeydown(index: number, field: keyof Channel, event: KeyboardEvent) {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      this.applyFieldChange(index, field);
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      const fieldKey = `${index}-${field}`;
-      this.editingFields.delete(fieldKey);
-      // Reset the input value to the original
-      const channel = this.visibleChannels().find((c) => c.index === index);
-      if (channel) {
-        (event.target as HTMLInputElement).value = String(channel[field] || '');
-      }
-    }
-  }
-
-  // Get the current editing value or the actual value
-  getFieldValue(index: number, field: keyof Channel): string {
-    const fieldKey = `${index}-${field}`;
-    if (this.editingFields.has(fieldKey)) {
-      return this.editingFields.get(fieldKey) || '';
-    }
-    const channel = this.visibleChannels().find((c) => c.index === index);
-    return channel ? String(channel[field] || '') : '';
-  }
-
-  // Apply the edited value when user clicks the apply button
-  applyFieldChange(index: number, field: keyof Channel) {
-    const fieldKey = `${index}-${field}`;
-    const value = this.editingFields.get(fieldKey);
-    if (value === undefined) return;
-
-    const channels = this.visibleChannels();
-    const channel = channels.find((c) => c.index === index);
-    if (!channel) return;
-
-    // Validate based on field type
-    if (field === 'bitrate' && value !== '' && !/^[0-9]+$/.test(value)) {
-      this.showAlert('Invalid bitrate. Please enter only numbers.');
-      this.editingFields.delete(fieldKey);
-      return;
-    }
-
-    const updatedChannels = channels.map((c) => (c.index === index ? { ...c, [field]: value } : c));
-    this.modifiedChannels.set(updatedChannels);
-    this.editingFields.delete(fieldKey); // Clear the editing value
-  }
-
-  // Check if a field has pending changes
-  hasFieldPendingChanges(index: number, field: keyof Channel): boolean {
-    const fieldKey = `${index}-${field}`;
-    if (!this.editingFields.has(fieldKey)) return false;
-
-    const channel = this.visibleChannels().find((c) => c.index === index);
-    if (!channel) return false;
-
-    return this.editingFields.get(fieldKey) !== String(channel[field] || '');
-  }
-
-  isFieldModified(index: number, field: keyof Channel): boolean {
-    return this.modifiedFields().has(`${index}-${field}`);
-  }
-
   resetChanges() {
     if (this.getConfirm('Are you sure you want to discard all changes?')) {
       this.modifiedChannels.set(null);
-      this.editingFields.clear();
     }
   }
 
@@ -306,8 +232,6 @@ export class LivestreamsContainerComponent implements OnInit {
 
   // Remove a channel and update indices
   removeChannel(index: number) {
-    this.applyPendingEdits();
-
     if (this.playingStreamUrl() === this.getChannelByIndex(index)?.url) {
       this.unloadAudioUrl();
     }
@@ -325,17 +249,6 @@ export class LivestreamsContainerComponent implements OnInit {
 
     // Update channels
     this.modifiedChannels.set(updatedChannels);
-
-    // Clear any editing fields for the removed channel and shifted channels
-    const keysToRemove: string[] = [];
-    this.editingFields.forEach((_, key) => {
-      const [indexStr] = key.split('-');
-      const editIndex = parseInt(indexStr);
-      if (editIndex >= index) {
-        keysToRemove.push(key);
-      }
-    });
-    keysToRemove.forEach((key) => this.editingFields.delete(key));
 
     this.errorChannel.set(null);
   }
@@ -441,8 +354,6 @@ export class LivestreamsContainerComponent implements OnInit {
 
   // Add the new channel
   addChannel() {
-    this.applyPendingEdits();
-
     // Validate required fields
     if (!this.newChannelFormData().url || !this.newChannelFormData().name) {
       this.showAlert('URL and Name are required fields');
@@ -592,8 +503,6 @@ export class LivestreamsContainerComponent implements OnInit {
   }
 
   sortChannelsByField(field: keyof Channel, dest: 'asc' | 'desc' = 'asc') {
-    this.applyPendingEdits();
-
     const channels = this.visibleChannels();
     const sorted = [...channels].sort((a, b) => {
       if (dest === 'desc') {
@@ -666,7 +575,6 @@ export class LivestreamsContainerComponent implements OnInit {
       error: (e) => console.error('Import failed', e),
       next: (channels) => {
         this.modifiedChannels.set(channels);
-        this.editingFields.clear();
       },
     });
   }
@@ -676,7 +584,6 @@ export class LivestreamsContainerComponent implements OnInit {
       error: (e) => console.error('Import failed', e),
       next: (channels) => {
         this.modifiedChannels.set(channels);
-        this.editingFields.clear();
       },
     });
   }
@@ -711,22 +618,7 @@ export class LivestreamsContainerComponent implements OnInit {
     return this.util.importLiveStreamsFromEuroTruckSimulator('live_streams.sii');
   }
 
-  applyPendingEdits() {
-    for (const [fieldKey, value] of this.editingFields.entries()) {
-      const [indexStr, field] = fieldKey.split('-');
-      const index = parseInt(indexStr);
-      const channels = this.visibleChannels();
-      const updatedChannels = channels.map((c) =>
-        c.index === index ? { ...c, [field]: value } : c
-      );
-      this.modifiedChannels.set(updatedChannels);
-    }
-
-    this.editingFields.clear();
-  }
-
   onSave() {
-    this.applyPendingEdits();
 
     // Export with the current (possibly modified) channel data
     const currentChannels = this.visibleChannels();
@@ -771,8 +663,6 @@ export class LivestreamsContainerComponent implements OnInit {
   }
 
   onExport() {
-    this.applyPendingEdits();
-
     // Export with the current (possibly modified) channel data
     const currentChannels = this.originalChannels();
     this.util
@@ -807,7 +697,6 @@ export class LivestreamsContainerComponent implements OnInit {
         next: (channels) => {
           this.modifiedChannels.set(null);
           this.originalChannels.set(channels);
-          this.editingFields.clear();
           this.loading.set(false);
           this.loaded.set(true);
         },
