@@ -121,6 +121,7 @@ export class LivestreamsContainerComponent implements OnInit {
 
   // Add form related
   showAddForm = signal(false);
+  editMode = signal(false);
 
   cdkDragStarted(e: CdkDragStart) {
     e.source.element.nativeElement.classList.add('bg-green-300')
@@ -267,6 +268,7 @@ export class LivestreamsContainerComponent implements OnInit {
 
   // Initialize the new channel form
   initNewChannel() {
+    this.editMode.set(false);
     this.newChannelFormData.set({
       ...this.defaultEmptyChannel,
       index: this.getNextIndex(),
@@ -277,6 +279,7 @@ export class LivestreamsContainerComponent implements OnInit {
 
   // Cancel adding a new channel
   cancelAddChannel() {
+    this.editMode.set(false);
     this.newChannelFormData.set(this.defaultEmptyChannel);
     this.showAddForm.set(false);
   }
@@ -335,6 +338,15 @@ export class LivestreamsContainerComponent implements OnInit {
     keysToRemove.forEach((key) => this.editingFields.delete(key));
 
     this.errorChannel.set(null);
+  }
+
+  editChannel(index: number) {
+    const channel = this.getChannelByIndex(index);
+    if (channel) {
+      this.editMode.set(true);
+      this.newChannelFormData.set(channel);
+      this.showAddForm.set(true);
+    }
   }
 
   newChannelIndexChange(index: number) {
@@ -455,7 +467,18 @@ export class LivestreamsContainerComponent implements OnInit {
       return;
     }
 
-    this.insertChannel(this.newChannelFormData());
+    if (this.editMode()) {
+      // Replace existing entry
+      const formData = this.newChannelFormData();
+      const channels = this.visibleChannels();
+      const updatedChannels = channels.map((c) =>
+        c.id === formData.id ? { ...formData } : c
+      );
+      this.modifiedChannels.set(updatedChannels);
+      this.editMode.set(false);
+    } else {
+      this.insertChannel(this.newChannelFormData());
+    }
 
     // Reset the form
     this.newChannelFormData.set(this.defaultEmptyChannel);
